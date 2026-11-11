@@ -1,0 +1,35 @@
+Table users {
+  id int [pk, increment]
+  created_at timestamp
+  ten varchar(100)
+  nam_sinh int
+}
+
+Table cabinet {
+  id int [pk, increment]
+  created_at timestamp
+  user_a int
+  user_b int
+}
+
+Table jars {
+  id int [pk, increment]
+  cabinet_id int
+  noi_dung varchar(255)
+  created_at timestamp
+}
+
+Table anh {
+  id int [pk, increment]
+  jar_id int
+  path varchar(500)
+}
+
+// Relationships
+
+Ref: cabinet.user_a > users.id
+Ref: cabinet.user_b > users.id
+
+Ref: jars.cabinet_id > cabinet.id
+
+Ref: anh.jar_id > jars.id
