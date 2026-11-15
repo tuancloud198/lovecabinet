@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Vue build dependencies and output
+node_modules/
+frontend/dist/
