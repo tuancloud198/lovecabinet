@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate
 from django.db import transaction
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
-from ..models import User
+from users.models import User
 
 def create_user(data):
     return User.objects.create_user(**data)

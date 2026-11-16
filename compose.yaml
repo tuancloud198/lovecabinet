@@ -1,3 +1,15 @@
+# Proxy for build-time downloads (pip, npm, go, apt). These are Docker's predefined
+# proxy build args: available to RUN steps but not saved in the final images. Leave
+# them empty in .env when no proxy is needed. They are named BUILD_* in .env because
+# services load .env via env_file: a plain HTTP_PROXY there would also route runtime
+# traffic (e.g. backend -> http://minio:9000) through the proxy.
+x-build-proxy: &build-proxy
+  HTTP_PROXY: ${BUILD_HTTP_PROXY:-}
+  HTTPS_PROXY: ${BUILD_HTTPS_PROXY:-}
+  NO_PROXY: ${BUILD_NO_PROXY:-}
+  http_proxy: ${BUILD_HTTP_PROXY:-}
+  https_proxy: ${BUILD_HTTPS_PROXY:-}
+  no_proxy: ${BUILD_NO_PROXY:-}
 services:
   db:
     image: postgres:16-alpine
@@ -12,7 +24,7 @@ services:
       timeout: 3s
       retries: 20
   minio:
-    build: ./infra/minio
+    build: {context: ./infra/minio, args: *build-proxy}
     image: lovecabinet-minio:local
     command: server /data --console-address ':9001'
     environment:
@@ -21,14 +33,14 @@ services:
     volumes: [minio_data:/data]
     ports: ['127.0.0.1:9001:9001']
   minio-init:
-    build: ./backend
+    build: {context: ., dockerfile: infra/backend/Dockerfile, args: *build-proxy}
     env_file: .env
     environment:
       MINIO_ENDPOINT: http://minio:9000
     command: python manage.py init_storage
     depends_on: [minio]
   migrate:
-    build: ./backend
+    build: {context: ., dockerfile: infra/backend/Dockerfile, args: *build-proxy}
     env_file: .env
     environment: &backend-env
       POSTGRES_HOST: db
@@ -37,14 +49,14 @@ services:
     depends_on:
       db: {condition: service_healthy}
   backend:
-    build: ./backend
+    build: {context: ., dockerfile: infra/backend/Dockerfile, args: *build-proxy}
     env_file: .env
     environment: *backend-env
     depends_on:
       migrate: {condition: service_completed_successfully}
       minio-init: {condition: service_completed_successfully}
   frontend:
-    build: ./frontend
+    build: {context: ., dockerfile: infra/frontend/Dockerfile, args: *build-proxy}
     ports: ['${APP_PORT:-8080}:80']
     depends_on: [backend]
 volumes:

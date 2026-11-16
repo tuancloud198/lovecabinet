@@ -1,5 +1,5 @@
 from common.services import save_scoped
-from ..models import Reaction
+from memories.models import Reaction
 
 def save_memory(serializer, user):
     return save_scoped(serializer, user, 'jar__cabinet__couple')

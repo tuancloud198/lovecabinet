@@ -1,6 +1,6 @@
 # Tủ Thương · Love Cabinet
 
-A private memory cabinet for two people, implemented with Django REST Framework, Vue 3, PostgreSQL and MinIO. The Vietnamese UI follows the colors, typography, rounded cards and jar collections in `task/ui-source/`. Layouts adapt to mobile and desktop; dog illustrations are represented by emoji, rather than extracted from the reference screenshots.
+A private memory cabinet for two people, implemented with Django REST Framework, Vue 3, PostgreSQL and MinIO. The Vietnamese UI follows the screens and design system in `task/ui-source/`: a phone-width app with a bottom navigation (Lịch, Tủ, Camera, Nhân Vật, Hồ Sơ), onboarding and pairing flows, jars on wooden cabinet shelves, the pet's growth stages and a month calendar. The dog characters in `frontend/src/assets/characters/` are cropped from those reference images. On wider screens the app is shown as a centered phone-width column.
 
 ## Run with Docker
 
@@ -11,7 +11,7 @@ docker compose up --build -d
 
 Open **http://localhost:8080**. The MinIO console is at **http://localhost:9001**, using the MinIO credentials in `.env`. PostgreSQL and the MinIO object API are internal to the Compose network. MinIO is built from its pinned upstream Go source release, avoiding the removed upstream container images. The init container creates a **private** bucket; the migration container applies committed migrations before the API starts. Database and images persist in named volumes.
 
-Create an account and generate an invitation. In another browser/private window, create a second account and enter the invitation code. The sender can click “Kiểm tra kết nối” to refresh. Invitations expire after 48 hours and may be accepted once. Pairing creates the shared cabinet. Add jars, save memories with photos, react, comment, and add upcoming events. The shared pet progresses with the number of saved memories.
+Every account gets a unique tag such as `#A7K2M9QX` (`#` + 8 uppercase letters and digits), shown with a copy button on the pairing screen and profile. Create two accounts in separate browser/private windows, copy one account's tag, and send an invitation to it from the other. The recipient sees the invitation after clicking “Kiểm tra lời mời · Làm mới” and accepts or declines it. Invitations expire after 48 hours and may be accepted once, by the recipient only. Pairing creates the shared cabinet. Add jars, save memories with photos, react, comment, and add upcoming events. The shared pet progresses with the number of saved memories.
 
 ```sh
 docker compose logs -f backend
@@ -21,6 +21,17 @@ docker compose down
 
 Before exposing this app publicly, set unique secrets in `.env`, configure `ALLOWED_HOSTS`, and serve it behind HTTPS. The provided stack is a local deployment. Tokens are sent in the Authorization header and kept in browser session storage; logging out revokes the token.
 
+## Images
+
+The frontend and backend are separate images, defined in `infra/`. Build them from the repo root:
+
+```sh
+docker build -f infra/backend/Dockerfile -t lovecabinet-backend .
+docker build -f infra/frontend/Dockerfile -t lovecabinet-frontend .
+```
+
+PostgreSQL and object storage are separate services the backend connects to through env vars (`POSTGRES_*`, `MINIO_*`; see the comments in `infra/backend/Dockerfile`). The frontend's nginx forwards `/api/` to `BACKEND_URL` (default `http://backend:8000`).
+
 ## Backend layout
 
 Each domain is a separate Django app: `users`, `couple_invitations`, `couples`, `cabinets`, `jars`, `memories`, `photos`, and `events`.
@@ -29,7 +40,7 @@ Each domain is a separate Django app: `users`, `couple_invitations`, `couples`, 
 backend/<app>/
   models.py
   migrations/
-  serializers/    # input validation and response representation
+  serializers/    # <entity>_serializers.py: input validation and response representation
   services/       # business rules and persistence operations
   views/          # HTTP handlers and scoped resource lookup
 ```
@@ -46,10 +57,11 @@ All routes use `/api/` and trailing slashes. Except registration/login, send `Au
 | --- | --- |
 | `auth/register/`, `auth/login/` | POST; return token and user |
 | `auth/logout/` | POST; revoke token |
-| `users/me/` | GET, PATCH profile |
-| `couple-invitations/` | POST; generate code |
-| `couple-invitations/accept/` | POST `{ "code": "..." }`; accept pairing |
-| `couples/`, `couples/<id>/` | GET shared couple, members and memory count |
+| `users/me/` | GET, PATCH profile (`tag` is read-only) |
+| `couple-invitations/` | GET pending `received` and `sent` invitations; POST `{ "tag": "#A7K2M9QX" }` to invite that user |
+| `couple-invitations/<id>/accept/` | POST; recipient accepts pairing |
+| `couple-invitations/<id>/decline/` | POST; recipient declines (204); the sender may invite again |
+| `couples/`, `couples/<id>/` | GET shared couple, members and memory count; PATCH `name`, `anniversary`, `pet_name`, `pet_type` (`dog`, `cat`, `capybara`) |
 | `cabinets/`, `jars/`, `memories/`, `events/` | CRUD collection and detail routes |
 | `memories/<id>/comment/` | POST `{ "text": "..." }` |
 | `memories/<id>/react/` | POST; toggle heart |
@@ -60,11 +72,10 @@ All routes use `/api/` and trailing slashes. Except registration/login, send `Au
 ## Local development
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r backend/requirements.txt
-python backend/manage.py migrate
-python backend/manage.py runserver
+uv venv
+uv pip install -r backend/requirements.txt
+uv run python backend/manage.py migrate
+uv run python backend/manage.py runserver
 ```
 
 Without `POSTGRES_HOST`, Django uses SQLite for local development and unit tests. For uploads, start MinIO and its bucket initializer with `docker compose up -d minio minio-init`, then expose its object API locally by adding `127.0.0.1:9000:9000` to the MinIO service's ports. The default backend MinIO endpoint is `http://localhost:9000`; credentials match `.env.example`.
@@ -78,9 +89,9 @@ npm run dev
 Vite proxies `/api/` to `localhost:8000`. In another terminal:
 
 ```sh
-python backend/manage.py check
-python backend/manage.py makemigrations --check --dry-run
-python backend/manage.py test common
+uv run python backend/manage.py check
+uv run python backend/manage.py makemigrations --check --dry-run
+uv run python backend/manage.py test common
 npm run build --prefix frontend
 ```
 

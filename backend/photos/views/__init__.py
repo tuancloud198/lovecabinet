@@ -3,9 +3,9 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from common.services import couple_for
-from ..models import Photo
-from ..serializers import PhotoSerializer, UploadSerializer
-from ..services import upload_photo, read_photo, delete_photo
+from photos.models import Photo
+from photos.serializers.photo_serializers import PhotoSerializer, UploadSerializer
+from photos.services import upload_photo, read_photo, delete_photo
 class PhotoViewSet(viewsets.GenericViewSet):
     serializer_class = PhotoSerializer
     def get_queryset(self):
