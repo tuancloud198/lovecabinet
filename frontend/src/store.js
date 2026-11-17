@@ -31,6 +31,8 @@ export const partner = computed(() => state.couple?.members.find(m => m.id !== s
 export function navigate(name, params = {}) {
   state.view = { name, params }
   window.scrollTo(0, 0)
+  // These screens list jars/cabinets the partner may have just created on their phone.
+  if (name === 'cabinet' || name === 'capture') refresh()
 }
 
 let toastTimer
@@ -65,6 +67,23 @@ export async function load() {
     ;[state.cabinets, state.jars, state.memories, state.events] = await Promise.all(['cabinets/', 'jars/', 'memories/', 'events/'].map(path => api(path)))
   } else {
     state.invites = await api('couple-invitations/')
+  }
+}
+
+/**
+ * Quietly re-fetch the couple's data so changes made by the partner show up without a reload.
+ * Skipped while an action is running (its own load() follows) and never shows the busy state.
+ */
+let refreshing = false
+export async function refresh() {
+  if (!state.token || !state.me || !state.couple || state.busy || refreshing) return
+  refreshing = true
+  try {
+    await load()
+  } catch (error) {
+    if (error.status === 401) signOutLocally()
+  } finally {
+    refreshing = false
   }
 }
 

@@ -43,6 +43,25 @@ class WorkflowTests(APITestCase):
         response = self.client.post('/api/memories/', {'jar': response.data['id'], 'title': 'Cà phê', 'date': '2026-11-15'})
         self.assertEqual(response.status_code, 201)
         return Memory.objects.get()
+    def test_partner_can_add_memory_to_jar_the_other_created(self):
+        memory = self.setup_memory()  # jar and first memory created by Bob
+        self.auth(self.alice)
+        response = self.client.post('/api/memories/', {'jar': memory.jar_id, 'title': 'Trà sữa', 'date': '2026-11-16'})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['author'], self.alice.pk)
+    def test_one_cabinet_per_couple_and_year(self):
+        self.pair()
+        existing = Cabinet.objects.get()
+        self.auth(self.alice)  # Alice's app did not know the cabinet exists yet
+        response = self.client.post('/api/cabinets/', {'name': 'Tủ thương', 'year': existing.year})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['id'], existing.pk)
+        self.assertEqual(Cabinet.objects.count(), 1)
+        other_year = self.client.post('/api/cabinets/', {'name': 'Tủ thương', 'year': existing.year + 1}).data['id']
+        response = self.client.patch(f'/api/cabinets/{other_year}/', {'year': existing.year})
+        self.assertEqual(response.status_code, 400)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Cabinet.objects.create(couple=existing.couple, name='Trùng', year=existing.year)
     def test_registration_login_logout(self):
         response = self.client.post('/api/auth/register/', {'username': 'new', 'password': 'secure-l0ng-password', 'display_name': 'Minh'})
         self.assertEqual(response.status_code, 201)

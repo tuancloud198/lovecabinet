@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { X } from 'lucide-vue-next'
-import { state, navigate, run, load } from '@/store.js'
+import { state, navigate, run, load, refresh } from '@/store.js'
 import BottomNav from '@/components/BottomNav.vue'
 import CabinetView from '@/views/CabinetView.vue'
 import CalendarView from '@/views/CalendarView.vue'
@@ -19,7 +19,13 @@ const TABS = ['calendar', 'cabinet', 'pet', 'profile']
 const showNav = computed(() => TABS.includes(state.view.name))
 const viewKey = computed(() => state.view.name + JSON.stringify(state.view.params))
 
-onMounted(() => { if (state.token) run(load) })
+// Coming back to the app (switching tabs, unlocking the phone): pick up what the partner added.
+function onVisibility() { if (document.visibilityState === 'visible') refresh() }
+onMounted(() => {
+  if (state.token) run(load)
+  document.addEventListener('visibilitychange', onVisibility)
+})
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility))
 </script>
 
 <template>
