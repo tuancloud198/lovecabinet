@@ -51,7 +51,14 @@ services:
   backend:
     build: {context: ., dockerfile: infra/backend/Dockerfile, args: *build-proxy}
     env_file: .env
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      # Outbound HTTPS (Google sign-in key download) through a proxy when the network needs one.
+      # HTTPS only, and internal hosts excluded, so MinIO/Postgres traffic stays direct.
+      HTTPS_PROXY: ${RUNTIME_HTTPS_PROXY:-}
+      https_proxy: ${RUNTIME_HTTPS_PROXY:-}
+      NO_PROXY: minio,db,backend,localhost,127.0.0.1
+      no_proxy: minio,db,backend,localhost,127.0.0.1
     depends_on:
       migrate: {condition: service_completed_successfully}
       minio-init: {condition: service_completed_successfully}

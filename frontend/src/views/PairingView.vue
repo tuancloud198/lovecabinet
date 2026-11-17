@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ArrowRight, Check, ChevronLeft, ChevronRight, Hourglass, Keyboard } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { art } from '@/characters.js'
-import { state, run, load, signOut } from '@/store.js'
+import { state, run, load, refreshPairing, signOut } from '@/store.js'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import UserTag from '@/components/UserTag.vue'
 
@@ -33,18 +33,27 @@ function respond(action) {
   })
 }
 
-// While unpaired, check for new invitations / acceptance every few seconds.
+// While waiting (our invite pending, or for someone to invite us), check every few
+// seconds — one lightweight request, and only while the tab is visible and the user
+// isn't in the middle of typing a code or answering an invitation.
+const POLL_MS = 5000
 let timer
+async function poll() {
+  if (document.hidden || state.busy || state.justPaired || entering.value || received.value) return
+  try {
+    await refreshPairing()
+    if (state.couple) state.justPaired = true
+  } catch { /* keep polling */ }
+}
+function onVisibility() { if (!document.hidden) poll() }
 onMounted(() => {
-  timer = setInterval(async () => {
-    if (state.busy || state.justPaired) return
-    try {
-      await load()
-      if (state.couple) state.justPaired = true
-    } catch { /* keep polling */ }
-  }, 5000)
+  timer = setInterval(poll, POLL_MS)
+  document.addEventListener('visibilitychange', onVisibility)
 })
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  document.removeEventListener('visibilitychange', onVisibility)
+})
 </script>
 
 <template>

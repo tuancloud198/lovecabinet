@@ -1,10 +1,11 @@
 from datetime import timedelta
 from io import BytesIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import ANY, patch, MagicMock
 from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models.query import QuerySet
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from users.models import User
@@ -154,6 +155,15 @@ class WorkflowTests(APITestCase):
         self.assertEqual(response.status_code, 201)
         storage.return_value.upload_fileobj.assert_called_once()
         photo_id = response.data['id']
+        key = Photo.objects.get(pk=photo_id).object_key
+        self.assertRegex(key, rf'^{memory.jar_id}/{memory.pk}/[0-9a-f]{{32}}\.png$')
+        other_jar = Jar.objects.create(cabinet=memory.jar.cabinet, name='Moved')
+        self.assertEqual(self.client.patch(f'/api/memories/{memory.pk}/', {'jar': other_jar.pk}).status_code, 200)
+        moved = Photo.objects.get(pk=photo_id).object_key
+        self.assertEqual(moved, f'{other_jar.pk}/{memory.pk}/' + key.rsplit('/', 1)[-1])
+        storage.return_value.copy_object.assert_called_once()
+        storage.return_value.delete_object.assert_called_once_with(Bucket=ANY, Key=key)
+        storage.return_value.delete_object.reset_mock()
         storage.return_value.get_object.return_value = {'Body': BytesIO(data.getvalue())}
         content = self.client.get(f'/api/photos/{photo_id}/content/')
         self.assertEqual(content.status_code, 200)
@@ -183,3 +193,55 @@ class WorkflowTests(APITestCase):
     def test_anonymous_denied(self):
         for endpoint in ['couples/', 'cabinets/', 'jars/', 'memories/', 'users/me/']:
             self.assertEqual(self.client.get('/api/' + endpoint).status_code, 401)
+
+GOOGLE_CLAIMS = {'sub': '1234567890', 'email': 'An.Nguyen@gmail.com', 'email_verified': True, 'name': 'An Nguyễn'}
+
+@override_settings(GOOGLE_CLIENT_ID='test-client.apps.googleusercontent.com')
+class GoogleLoginTests(APITestCase):
+    @patch('google.oauth2.id_token.verify_oauth2_token', return_value=GOOGLE_CLAIMS)
+    def test_signup_then_login_with_same_google_account(self, verify):
+        response = self.client.post('/api/auth/google/', {'credential': 'id-token'})
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['created'])
+        self.assertEqual(response.data['user']['display_name'], 'An Nguyễn')
+        self.assertEqual(verify.call_args.args[2], 'test-client.apps.googleusercontent.com')
+        self.assertEqual(verify.call_args.kwargs['clock_skew_in_seconds'], 60)
+        user = User.objects.get(google_sub='1234567890')
+        self.assertEqual(user.email, 'an.nguyen@gmail.com')
+        self.assertFalse(user.has_usable_password())
+        again = self.client.post('/api/auth/google/', {'credential': 'id-token'})
+        self.assertEqual(again.status_code, 200)
+        self.assertFalse(again.data['created'])
+        self.assertEqual(again.data['token'], response.data['token'])
+        self.assertEqual(User.objects.count(), 1)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {again.data["token"]}')
+        self.assertEqual(self.client.get('/api/users/me/').data['id'], user.pk)
+
+    @patch('google.oauth2.id_token.verify_oauth2_token', return_value=GOOGLE_CLAIMS)
+    def test_username_collision_gets_suffix(self, verify):
+        User.objects.create_user(username='an.nguyen@gmail.com', password='Str0ng-pass!', display_name='Someone')
+        self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'id-token'}).status_code, 201)
+        self.assertTrue(User.objects.get(google_sub='1234567890').username.startswith('an.nguyen@gmail.com-'))
+
+    @patch('google.oauth2.id_token.verify_oauth2_token', side_effect=ValueError('bad signature'))
+    def test_invalid_token_rejected(self, verify):
+        self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'forged'}).status_code, 400)
+        self.assertFalse(User.objects.exists())
+
+    @patch('google.oauth2.id_token.verify_oauth2_token', return_value={**GOOGLE_CLAIMS, 'email_verified': False})
+    def test_unverified_email_rejected(self, verify):
+        self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'id-token'}).status_code, 400)
+
+    @override_settings(GOOGLE_CLIENT_ID='')
+    def test_disabled_without_client_id(self):
+        self.assertEqual(self.client.get('/api/auth/config/').data, {'google_client_id': ''})
+        self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'id-token'}).status_code, 400)
+
+    @patch('google.oauth2.id_token.verify_oauth2_token')
+    def test_google_unreachable_returns_503(self, verify):
+        from google.auth.exceptions import TransportError
+        verify.side_effect = TransportError('connect timeout')
+        self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'id-token'}).status_code, 503)
+
+    def test_config_exposes_client_id(self):
+        self.assertEqual(self.client.get('/api/auth/config/').data, {'google_client_id': 'test-client.apps.googleusercontent.com'})

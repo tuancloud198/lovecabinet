@@ -12,13 +12,12 @@ import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
 
 const JAR_COLORS = ['#F6C9C4', '#BFD7EA', '#F3D9A4', '#CFE3CF', '#E3D3EE']
-const ownerId = computed(() => (state.owner === 'me' ? state.me.id : partner.value?.id))
 const years = computed(() => [...new Set([new Date().getFullYear(), ...state.cabinets.map(c => c.year)])].sort((a, b) => b - a))
 const jars = computed(() => {
   const cabinetIds = state.cabinets.filter(c => c.year === Number(state.year)).map(c => c.id)
   return state.jars.filter(j => cabinetIds.includes(j.cabinet))
 })
-const memoriesIn = jar => state.memories.filter(m => m.jar === jar.id && m.author === ownerId.value)
+const memoriesIn = jar => state.memories.filter(m => m.jar === jar.id)
 const emojisIn = jar => {
   const emojis = memoriesIn(jar).map(m => m.emoji)
   return emojis.length ? emojis : [jar.emoji]
@@ -68,13 +67,11 @@ function saveJar() {
       <button class="icon-button bell" aria-label="Thông báo" @click="openNotifications"><Bell :size="22" /><span v-if="unread" class="dot"></span></button>
     </AppHeader>
 
-    <div class="owner-switch" role="tablist" aria-label="Chọn tủ">
-      <button role="tab" :aria-selected="state.owner === 'me'" :class="{ active: state.owner === 'me' }" @click="state.owner = 'me'">
-        <CharacterAvatar :user="state.me" :size="64" :selected="state.owner === 'me'" /><span>Tủ của tôi</span>
-      </button>
-      <button role="tab" :aria-selected="state.owner === 'partner'" :class="{ active: state.owner === 'partner' }" @click="state.owner = 'partner'">
-        <CharacterAvatar :user="partner" :size="64" :selected="state.owner === 'partner'" /><span>Tủ người yêu</span>
-      </button>
+    <div class="couple-head">
+      <CharacterAvatar :user="state.me" :size="56" />
+      <span class="heart" aria-hidden="true">♡</span>
+      <CharacterAvatar :user="partner" :size="56" />
+      <span class="visually-hidden">Tủ chung của {{ state.me.display_name }} và {{ partner?.display_name }}</span>
     </div>
     <label class="year-chip"><span class="visually-hidden">Năm</span>
       <select v-model.number="state.year"><option v-for="y in years" :key="y" :value="y">{{ y }}</option></select><ChevronDown :size="16" />

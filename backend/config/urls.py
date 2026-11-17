@@ -15,6 +15,8 @@ for prefix, view, basename in [('couples', CoupleViewSet, 'couple'), ('cabinets'
 urlpatterns = [path('api/healthz/', health.live), path('api/readyz/', health.ready), path('api/auth/register/', users.register), 
                 path('api/auth/login/', users.login), 
                 path('api/auth/logout/', users.logout), 
+                path('api/auth/google/', users.google), 
+                path('api/auth/config/', users.auth_config), 
                 path('api/users/me/', users.me), 
                 path('api/couple-invitations/', 
                 invitations.invitations), 

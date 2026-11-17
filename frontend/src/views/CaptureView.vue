@@ -1,18 +1,20 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
-import { Amphora, Camera, ImagePlus, RefreshCw, X } from 'lucide-vue-next'
+import { Amphora, Camera, ImagePlus, X } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { isoDate } from '@/format.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import PhotoViewer from '@/components/PhotoViewer.vue'
 
 const props = defineProps({ jarId: Number })
 const jars = computed(() => [...state.jars].sort((a, b) => b.id - a.id))
 const form = ref({ jar: props.jarId || jars.value[0]?.id, title: '', story: '', date: isoDate(), emoji: '❤️' })
 const photos = ref([]) // [{ file, url }]
 const current = ref(0)
+const viewing = ref(false)
 const savedId = ref(null) // memory saved but some photos still pending
 
 function pick(event) {
@@ -39,7 +41,6 @@ function save() {
     }
     await load()
     toast('Đã lưu vào Tủ! ♡')
-    state.owner = 'me'
     navigate('jar', { id: form.value.jar })
   })
 }
@@ -57,10 +58,9 @@ function save() {
 
     <form v-else class="capture" @submit.prevent="save">
       <div class="photo-frame">
-        <template v-if="photos.length">
+        <button v-if="photos.length" type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
           <img :src="photos[current].url" alt="Ảnh đã chọn" />
-          <label class="photo-action" aria-label="Chọn ảnh khác"><RefreshCw :size="18" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple @change="pick" /></label>
-        </template>
+        </button>
         <div v-else class="photo-empty">
           <Camera :size="40" />
           <div class="photo-buttons">
@@ -70,12 +70,15 @@ function save() {
           <small>JPEG, PNG, WebP · tối đa 10 MB/ảnh</small>
         </div>
       </div>
-      <div v-if="photos.length > 1" class="thumb-strip">
+      <div v-if="photos.length" class="thumb-strip">
         <span v-for="(p, i) in photos" :key="p.url" class="thumb-wrap" :class="{ chosen: current === i }">
           <button type="button" :aria-label="`Ảnh ${i + 1}`" @click="current = i"><img :src="p.url" alt="" /></button>
           <button type="button" class="thumb-remove" aria-label="Bỏ ảnh" @click="drop(i)"><X :size="12" /></button>
         </span>
+        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple @change="pick" /></label>
+        <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" @change="pick" /></label>
       </div>
+      <PhotoViewer v-if="viewing && photos.length" :urls="photos.map(p => p.url)" :start="current" @close="viewing = false" />
 
       <section class="sheet-section stack">
         <div class="field"><span class="field-title">Chọn emoji cho kỷ niệm này</span><EmojiPicker v-model="form.emoji" /></div>

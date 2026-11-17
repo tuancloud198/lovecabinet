@@ -27,6 +27,8 @@ class User(AbstractUser):
     birth_date = models.DateField(null=True, blank=True)
     bio = models.CharField(max_length=120, blank=True)
     gender = models.CharField(max_length=30, blank=True)
+    # Google account id ("sub" claim) for users who sign in with Google.
+    google_sub = models.CharField(max_length=255, unique=True, null=True, blank=True, editable=False)
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

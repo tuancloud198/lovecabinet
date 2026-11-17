@@ -21,6 +21,14 @@ docker compose down
 
 Before exposing this app publicly, set unique secrets in `.env`, configure `ALLOWED_HOSTS`, and serve it behind HTTPS. The provided stack is a local deployment. Tokens are sent in the Authorization header and kept in browser session storage; logging out revokes the token.
 
+## Sign in with Google
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application** (configure the OAuth consent screen first if asked).
+2. Under **Authorized JavaScript origins**, add every origin the app is opened from, e.g. `http://localhost:8080` and `http://localhost:5173`. No redirect URI or client secret is needed.
+3. Put the client ID in `.env` as `GOOGLE_CLIENT_ID=…apps.googleusercontent.com` and restart the backend.
+
+The button uses Google Identity Services: the browser receives a Google ID token, and `POST /api/auth/google/` verifies its signature, audience and verified email before returning the usual API token. The first sign-in creates an account (username = the Gmail address, no password) and opens profile setup; later sign-ins match the Google account ID. The backend must be able to reach `www.googleapis.com` to fetch Google's signing keys. With `GOOGLE_CLIENT_ID` empty the button is hidden.
+
 ## Images
 
 The frontend and backend are separate images, defined in `infra/`. Build them from the repo root:
@@ -47,7 +55,7 @@ backend/<app>/
 
 `common/services.py` supplies shared couple ownership checks and scoped writes. `common/api.py` supplies reusable viewset behavior. Each app's service layer uses these where applicable. Invitations lock user rows in a transaction to prevent double pairing. A membership is unique per user. Memories, jars, events and photographs are accessible only to the two members of their couple, including when a request changes a parent relation.
 
-Photo uploads accept verified JPEG, PNG and WebP files up to 10 MB each. The database stores object keys, while bytes live in MinIO. Photos are streamed through the authenticated API so the bucket and object URLs are never public. Deleting a cabinet, jar or memory removes its associated MinIO objects first. Keep database and object storage backups together; object deletion and relational transactions cannot be atomic across the two systems.
+Photo uploads accept verified JPEG, PNG and WebP files up to 10 MB each. The database stores object keys (`{jar id}/{memory id}/{random}.{ext}`; moved when a memory changes jar), while bytes live in MinIO. Photos are streamed through the authenticated API so the bucket and object URLs are never public. Deleting a cabinet, jar or memory removes its associated MinIO objects first. Keep database and object storage backups together; object deletion and relational transactions cannot be atomic across the two systems.
 
 ## API
 
@@ -57,6 +65,8 @@ All routes use `/api/` and trailing slashes. Except registration/login, send `Au
 | --- | --- |
 | `auth/register/`, `auth/login/` | POST; return token and user |
 | `auth/logout/` | POST; revoke token |
+| `auth/google/` | POST `{ "credential": "<Google ID token>" }`; returns token, user and `created` |
+| `auth/config/` | GET public sign-in settings (`google_client_id`) |
 | `users/me/` | GET, PATCH profile (`tag` is read-only) |
 | `couple-invitations/` | GET pending `received` and `sent` invitations; POST `{ "tag": "#A7K2M9QX" }` to invite that user |
 | `couple-invitations/<id>/accept/` | POST; recipient accepts pairing |

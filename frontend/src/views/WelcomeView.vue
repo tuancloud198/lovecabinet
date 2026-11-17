@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { ArrowRight, ChevronLeft } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { art } from '@/characters.js'
+import GoogleButton from '@/components/GoogleButton.vue'
 import JarArt from '@/components/JarArt.vue'
 import { state, run, signIn } from '@/store.js'
 
@@ -20,6 +21,13 @@ function submit() {
   run(async () => {
     const data = await api(`auth/${step.value}/`, { method: 'POST', body: form.value })
     if (step.value === 'register') state.onboarding = 'profile'
+    await signIn(data.token)
+  })
+}
+function googleSignIn(credential) {
+  run(async () => {
+    const data = await api('auth/google/', { method: 'POST', body: { credential } })
+    if (data.created) state.onboarding = 'profile'
     await signIn(data.token)
   })
 }
@@ -46,6 +54,8 @@ function submit() {
     <div class="welcome-actions">
       <button class="btn primary block" @click="open('register')">Bắt đầu <ArrowRight :size="18" /></button>
       <button class="link-button" @click="open('login')">Đã có tài khoản? <strong>Đăng nhập</strong></button>
+      <GoogleButton @credential="googleSignIn" />
+      <p v-if="state.error" class="form-error" role="alert">{{ state.error }}</p>
     </div>
   </section>
 
@@ -69,5 +79,6 @@ function submit() {
       <button class="btn primary block" :disabled="state.busy">{{ state.busy ? 'Đang xử lý…' : step === 'register' ? 'Tiếp tục' : 'Vào Tủ Thương' }}</button>
       <button type="button" class="link-button" @click="open(step === 'register' ? 'login' : 'register')">{{ step === 'register' ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Tạo hồ sơ' }}</button>
     </form>
+    <GoogleButton @credential="googleSignIn" />
   </section>
 </template>

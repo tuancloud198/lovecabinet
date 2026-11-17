@@ -22,6 +22,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         from users.services import create_user
         return create_user(data)
 
+class GoogleLoginSerializer(serializers.Serializer):
+    credential = serializers.CharField(max_length=4096)
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True)

@@ -1,5 +1,6 @@
 import { reactive, computed } from 'vue'
 import { api, getToken, setToken } from '@/api.js'
+import { clearPhotos } from '@/photos.js'
 
 const emptyInvites = () => ({ received: [], sent: [] })
 
@@ -21,8 +22,7 @@ export const state = reactive({
   justPaired: false,
   /** Main app screen: { name, params }. */
   view: { name: 'cabinet', params: {} },
-  /** Cabinet filters: whose memories ('me' | 'partner') and which year. */
-  owner: 'me',
+  /** Cabinet filter: which year. */
   year: new Date().getFullYear(),
 })
 
@@ -68,6 +68,18 @@ export async function load() {
   }
 }
 
+/**
+ * Cheap check used while waiting to be paired: one request for the invitations, and a
+ * full load() only when something changed that may mean we are now a couple.
+ */
+export async function refreshPairing() {
+  const before = state.invites
+  const invites = await api('couple-invitations/')
+  const sentGone = before.sent.some(s => !invites.sent.some(i => i.id === s.id))
+  state.invites = invites
+  if (sentGone) await load() // our invitation was accepted (or declined/expired)
+}
+
 export async function signIn(token) {
   setToken(token)
   state.token = token
@@ -76,7 +88,8 @@ export async function signIn(token) {
 
 function signOutLocally() {
   setToken('')
-  Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], invites: emptyInvites(), onboarding: '', justPaired: false, owner: 'me', view: { name: 'cabinet', params: {} } })
+  clearPhotos()
+  Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], invites: emptyInvites(), onboarding: '', justPaired: false, view: { name: 'cabinet', params: {} } })
 }
 
 export async function signOut() {

@@ -14,6 +14,7 @@ export class ApiError extends Error {
 
 function describe(data) {
   if (typeof data === 'string') return data
+  if (Array.isArray(data)) return data.join(' ') // DRF ValidationError('...') responds with ["..."]
   return Object.entries(data)
     .map(([key, value]) => `${key === 'detail' || key === 'non_field_errors' ? '' : key + ': '}${Array.isArray(value) ? value.join(' ') : value}`)
     .join(' ')
