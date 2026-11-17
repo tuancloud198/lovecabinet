@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { Camera, Heart, ImagePlus, Send, Trash2, X } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
-import { forgetPhoto } from '@/photos.js'
+import { forgetPhoto, uploadablePhoto } from '@/photos.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
@@ -39,7 +39,7 @@ function addPhotos(event) {
       for (const file of files) {
         const body = new FormData()
         body.append('memory', props.id)
-        body.append('file', file)
+        body.append('file', await uploadablePhoto(file))
         await api('photos/', { method: 'POST', body })
       }
     } finally {

@@ -8,6 +8,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import { uploadablePhoto } from '@/photos.js'
 
 const props = defineProps({ jarId: Number })
 const jars = computed(() => [...state.jars].sort((a, b) => b.id - a.id))
@@ -35,7 +36,7 @@ function save() {
     while (photos.value.length) {
       const body = new FormData()
       body.append('memory', savedId.value)
-      body.append('file', photos.value[0].file)
+      body.append('file', await uploadablePhoto(photos.value[0].file))
       await api('photos/', { method: 'POST', body })
       drop(0)
     }

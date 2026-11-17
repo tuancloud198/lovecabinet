@@ -1,4 +1,5 @@
 import io
+import logging
 import warnings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -6,6 +7,7 @@ from pillow_heif import register_heif_opener
 from rest_framework import serializers
 from photos.models import Photo
 
+logger = logging.getLogger(__name__)
 register_heif_opener()  # lets Pillow read HEIC/HEIF (iPhone photos)
 FORMATS = {'JPEG': 'image/jpeg', 'PNG': 'image/png', 'WEBP': 'image/webp'}
 
@@ -33,6 +35,8 @@ class UploadSerializer(serializers.Serializer):
     def validate_file(self, upload):
         if upload.size > 10 * 1024 * 1024:
             raise serializers.ValidationError('Chọn ảnh tối đa 10 MB.')
+        header = upload.read(32)  # file signature, logged when the photo is rejected
+        upload.seek(0)
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter('error', Image.DecompressionBombWarning)
@@ -42,7 +46,8 @@ class UploadSerializer(serializers.Serializer):
                     upload = heif_to_jpeg(upload)
                 else:
                     upload.content_type = FORMATS[image.format]
-        except (UnidentifiedImageError, OSError, KeyError, ValueError, Image.DecompressionBombWarning, Image.DecompressionBombError):
+        except (UnidentifiedImageError, OSError, KeyError, ValueError, Image.DecompressionBombWarning, Image.DecompressionBombError) as error:
+            logger.warning('Photo rejected: %r (name=%r, type=%r, size=%s, head=%r)', error, upload.name, upload.content_type, upload.size, header)
             raise serializers.ValidationError('Chỉ hỗ trợ ảnh JPEG, PNG, WebP và HEIC/HEIF hợp lệ.')
         upload.seek(0)
         return upload

@@ -25,3 +25,27 @@ export function forgetPhoto(url) {
 export function clearPhotos() {
   for (const url of [...cache.keys()]) forgetPhoto(url)
 }
+
+// HEIC/HEIF (iPhone): browsers that can decode it (Safari) convert it to JPEG before
+// upload, so the server never has to. Elsewhere the original is sent and the server converts.
+const MAX_PIXELS = 16_000_000 // iOS Safari refuses larger canvases
+export async function uploadablePhoto(file) {
+  if (!/^image\/hei[cf]/i.test(file.type) && !/\.hei[cf]$/i.test(file.name)) return file
+  const url = URL.createObjectURL(file)
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode() // rejects when the browser can't read HEIF
+    const scale = Math.min(1, Math.sqrt(MAX_PIXELS / (img.naturalWidth * img.naturalHeight)))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.naturalWidth * scale)
+    canvas.height = Math.round(img.naturalHeight * scale)
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    return blob ? new File([blob], file.name.replace(/\.[^.]*$/, '') + '.jpg', { type: 'image/jpeg' }) : file
+  } catch {
+    return file
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
