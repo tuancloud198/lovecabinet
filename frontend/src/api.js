@@ -1,11 +1,30 @@
-const TOKEN_KEY = 'token'
+export const TOKEN_KEY = 'token'
+
+// The token lives in localStorage so the user stays signed in after closing the browser,
+// until they sign out (which also revokes it on the server). Storage can be unavailable
+// (private mode, blocked site data), in which case the session simply isn't remembered.
+function storage(kind) {
+  try { return window[kind] } catch { return null }
+}
 
 export function getToken() {
-  return sessionStorage.getItem(TOKEN_KEY) || ''
+  try {
+    const saved = storage('localStorage')?.getItem(TOKEN_KEY)
+    if (saved) return saved
+    // Sessions from before "stay signed in" were kept in sessionStorage: carry them over.
+    const old = storage('sessionStorage')?.getItem(TOKEN_KEY)
+    if (old) setToken(old)
+    return old || ''
+  } catch {
+    return ''
+  }
 }
 export function setToken(token) {
-  if (token) sessionStorage.setItem(TOKEN_KEY, token)
-  else sessionStorage.removeItem(TOKEN_KEY)
+  try {
+    storage('sessionStorage')?.removeItem(TOKEN_KEY)
+    if (token) storage('localStorage')?.setItem(TOKEN_KEY, token)
+    else storage('localStorage')?.removeItem(TOKEN_KEY)
+  } catch { /* not remembered; the in-memory session still works */ }
 }
 
 export class ApiError extends Error {

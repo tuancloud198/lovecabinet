@@ -1,5 +1,5 @@
 import { reactive, computed } from 'vue'
-import { api, getToken, setToken } from '@/api.js'
+import { api, getToken, setToken, TOKEN_KEY } from '@/api.js'
 import { clearPhotos } from '@/photos.js'
 
 const emptyInvites = () => ({ received: [], sent: [] })
@@ -91,6 +91,13 @@ function signOutLocally() {
   clearPhotos()
   Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], invites: emptyInvites(), onboarding: '', justPaired: false, view: { name: 'cabinet', params: {} } })
 }
+
+// Signing out (or in as someone else) in another tab applies here too.
+window.addEventListener('storage', event => {
+  if (event.key !== TOKEN_KEY || event.newValue === state.token) return
+  if (!event.newValue) signOutLocally()
+  else window.location.reload()
+})
 
 export async function signOut() {
   await run(async () => {

@@ -19,7 +19,7 @@ docker compose exec backend python manage.py test common
 docker compose down
 ```
 
-Before exposing this app publicly, set unique secrets in `.env`, configure `ALLOWED_HOSTS`, and serve it behind HTTPS. The provided stack is a local deployment. Tokens are sent in the Authorization header and kept in browser session storage; logging out revokes the token.
+Before exposing this app publicly, set unique secrets in `.env`, configure `ALLOWED_HOSTS`, and serve it behind HTTPS. The provided stack is a local deployment. Tokens are sent in the Authorization header and kept in browser local storage, so users stay signed in across browser restarts; logging out (in any tab) revokes the token.
 
 ## Sign in with Google
 
