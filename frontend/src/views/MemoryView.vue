@@ -86,7 +86,7 @@ function remove() {
         <button v-if="mine" type="button" class="thumb-remove" aria-label="Xóa ảnh" :disabled="state.busy" @click="removePhoto(p)"><X :size="12" /></button>
       </span>
       <template v-if="mine">
-        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple :disabled="state.busy" @change="addPhotos" /></label>
+        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple :disabled="state.busy" @change="addPhotos" /></label>
         <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
       </template>
     </div>

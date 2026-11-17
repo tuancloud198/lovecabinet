@@ -192,6 +192,19 @@ class WorkflowTests(APITestCase):
         self.auth(self.alice)
         self.assertEqual(self.client.delete(f'/api/photos/{photo_id}/').status_code, 204)
         storage.return_value.delete_object.assert_called_once()
+    @patch('photos.services.storage')
+    def test_heic_upload_is_stored_as_jpeg(self, storage):
+        memory = self.setup_memory()
+        data = BytesIO()
+        Image.new('RGB', (16, 16), 'red').save(data, format='HEIF')
+        response = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('IMG_0001.HEIC', data.getvalue(), content_type='image/heic')}, format='multipart')
+        self.assertEqual(response.status_code, 201)
+        photo = Photo.objects.get(pk=response.data['id'])
+        self.assertEqual(photo.content_type, 'image/jpeg')
+        self.assertRegex(photo.object_key, r'\.jpg$')
+        fileobj, _, _ = storage.return_value.upload_fileobj.call_args.args
+        self.assertEqual(storage.return_value.upload_fileobj.call_args.kwargs['ExtraArgs'], {'ContentType': 'image/jpeg'})
+        self.assertEqual(Image.open(fileobj).format, 'JPEG')
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

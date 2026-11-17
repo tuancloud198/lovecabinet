@@ -1,7 +1,14 @@
+import io
 import warnings
-from PIL import Image, UnidentifiedImageError
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 from rest_framework import serializers
 from photos.models import Photo
+
+register_heif_opener()  # lets Pillow read HEIC/HEIF (iPhone photos)
+FORMATS = {'JPEG': 'image/jpeg', 'PNG': 'image/png', 'WEBP': 'image/webp'}
+
 class PhotoSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     def get_url(self, obj):
@@ -9,6 +16,17 @@ class PhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Photo
         fields = ['id', 'memory', 'url']
+
+def heif_to_jpeg(upload):
+    """Most browsers can't display HEIC/HEIF, so store those photos as JPEG instead."""
+    upload.seek(0)
+    with Image.open(upload) as image:
+        image = ImageOps.exif_transpose(image).convert('RGB')
+        buffer = io.BytesIO()
+        image.save(buffer, 'JPEG', quality=90)
+    name = (upload.name or 'photo').rsplit('.', 1)[0] + '.jpg'
+    return InMemoryUploadedFile(buffer, 'file', name, 'image/jpeg', buffer.getbuffer().nbytes, None)
+
 class UploadSerializer(serializers.Serializer):
     memory = serializers.IntegerField(min_value=1)
     file = serializers.FileField()
@@ -20,8 +38,11 @@ class UploadSerializer(serializers.Serializer):
                 warnings.simplefilter('error', Image.DecompressionBombWarning)
                 image = Image.open(upload)
                 image.verify()
-                upload.content_type = {'JPEG': 'image/jpeg', 'PNG': 'image/png', 'WEBP': 'image/webp'}[image.format]
-        except (UnidentifiedImageError, OSError, KeyError, Image.DecompressionBombWarning, Image.DecompressionBombError):
-            raise serializers.ValidationError('Chỉ hỗ trợ ảnh JPEG, PNG và WebP hợp lệ.')
+                if image.format == 'HEIF':
+                    upload = heif_to_jpeg(upload)
+                else:
+                    upload.content_type = FORMATS[image.format]
+        except (UnidentifiedImageError, OSError, KeyError, ValueError, Image.DecompressionBombWarning, Image.DecompressionBombError):
+            raise serializers.ValidationError('Chỉ hỗ trợ ảnh JPEG, PNG, WebP và HEIC/HEIF hợp lệ.')
         upload.seek(0)
         return upload

@@ -59,23 +59,24 @@ function save() {
     <form v-else class="capture" @submit.prevent="save">
       <div class="photo-frame">
         <button v-if="photos.length" type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
-          <img :src="photos[current].url" alt="Ảnh đã chọn" />
+          <img v-if="!photos[current].noPreview" :src="photos[current].url" alt="Ảnh đã chọn" @error="photos[current].noPreview = true" />
+          <span v-else class="photo-placeholder">📷</span> <!-- e.g. HEIC outside Safari: uploads fine, the server converts it -->
         </button>
         <div v-else class="photo-empty">
           <Camera :size="40" />
           <div class="photo-buttons">
             <label class="btn primary small"><Camera :size="16" /> Chụp ảnh<input type="file" accept="image/*" capture="environment" @change="pick" /></label>
-            <label class="btn outline small"><ImagePlus :size="16" /> Thư viện<input type="file" accept="image/jpeg,image/png,image/webp" multiple @change="pick" /></label>
+            <label class="btn outline small"><ImagePlus :size="16" /> Thư viện<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple @change="pick" /></label>
           </div>
-          <small>JPEG, PNG, WebP · tối đa 10 MB/ảnh</small>
+          <small>JPEG, PNG, WebP, HEIC · tối đa 10 MB/ảnh</small>
         </div>
       </div>
       <div v-if="photos.length" class="thumb-strip">
         <span v-for="(p, i) in photos" :key="p.url" class="thumb-wrap" :class="{ chosen: current === i }">
-          <button type="button" :aria-label="`Ảnh ${i + 1}`" @click="current = i"><img :src="p.url" alt="" /></button>
+          <button type="button" :aria-label="`Ảnh ${i + 1}`" @click="current = i"><img v-if="!p.noPreview" :src="p.url" alt="" @error="p.noPreview = true" /><span v-else class="photo-placeholder">📷</span></button>
           <button type="button" class="thumb-remove" aria-label="Bỏ ảnh" @click="drop(i)"><X :size="12" /></button>
         </span>
-        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp" multiple @change="pick" /></label>
+        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple @change="pick" /></label>
         <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" @change="pick" /></label>
       </div>
       <PhotoViewer v-if="viewing && photos.length" :urls="photos.map(p => p.url)" :start="current" @close="viewing = false" />

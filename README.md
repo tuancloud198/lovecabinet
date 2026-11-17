@@ -55,7 +55,7 @@ backend/<app>/
 
 `common/services.py` supplies shared couple ownership checks and scoped writes. `common/api.py` supplies reusable viewset behavior. Each app's service layer uses these where applicable. Invitations lock user rows in a transaction to prevent double pairing. A membership is unique per user. Memories, jars, events and photographs are accessible only to the two members of their couple, including when a request changes a parent relation.
 
-Photo uploads accept verified JPEG, PNG and WebP files up to 10 MB each. The database stores object keys (`{jar id}/{memory id}/{random}.{ext}`; moved when a memory changes jar), while bytes live in MinIO. Photos are streamed through the authenticated API so the bucket and object URLs are never public. Deleting a cabinet, jar or memory removes its associated MinIO objects first. Keep database and object storage backups together; object deletion and relational transactions cannot be atomic across the two systems.
+Photo uploads accept verified JPEG, PNG, WebP and HEIC/HEIF files up to 10 MB each (HEIC/HEIF is converted to JPEG on upload, since most browsers cannot display it). The database stores object keys (`{jar id}/{memory id}/{random}.{ext}`; moved when a memory changes jar), while bytes live in MinIO. Photos are streamed through the authenticated API so the bucket and object URLs are never public. Deleting a cabinet, jar or memory removes its associated MinIO objects first. Keep database and object storage backups together; object deletion and relational transactions cannot be atomic across the two systems.
 
 ## API
 
