@@ -43,6 +43,13 @@ class WorkflowTests(APITestCase):
         response = self.client.post('/api/memories/', {'jar': response.data['id'], 'title': 'Cà phê', 'date': '2026-11-15'})
         self.assertEqual(response.status_code, 201)
         return Memory.objects.get()
+    @patch('photos.services.storage')
+    def test_partner_can_delete_memory_the_other_created(self, storage):
+        memory = self.setup_memory()
+        partner = self.bob if memory.author == self.alice else self.alice
+        self.auth(partner)
+        self.assertEqual(self.client.delete(f'/api/memories/{memory.pk}/').status_code, 204)
+        self.assertFalse(Memory.objects.exists())
     def test_partner_can_add_memory_to_jar_the_other_created(self):
         memory = self.setup_memory()  # jar and first memory created by Bob
         self.auth(self.alice)

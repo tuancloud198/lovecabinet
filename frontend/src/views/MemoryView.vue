@@ -15,7 +15,6 @@ const memory = computed(() => state.memories.find(m => m.id === props.id))
 const photo = ref(0)
 const current = computed(() => Math.min(photo.value, Math.max(0, (memory.value?.photos.length || 1) - 1)))
 const viewing = ref(false)
-const mine = computed(() => memory.value?.author === state.me.id)
 const comment = ref('')
 const member = id => state.couple.members.find(m => m.id === id)
 const back = () => navigate('jar', { id: memory.value?.jar })
@@ -72,7 +71,7 @@ function remove() {
 <template>
   <div v-if="memory" class="page">
     <AppHeader :title="displayDate(memory.date)" back @back="back">
-      <button v-if="memory.author === state.me.id" class="icon-button" aria-label="Xóa kỷ niệm" @click="remove"><Trash2 :size="20" /></button>
+      <button class="icon-button" aria-label="Xóa kỷ niệm" @click="remove"><Trash2 :size="20" /></button>
     </AppHeader>
     <div class="photo-frame">
       <button v-if="memory.photos.length" type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
@@ -80,15 +79,13 @@ function remove() {
       </button>
       <span v-else class="photo-emoji">{{ memory.emoji }}</span>
     </div>
-    <div v-if="memory.photos.length > 1 || mine" class="thumb-strip">
+    <div class="thumb-strip">
       <span v-for="(p, i) in memory.photos" :key="p.id" class="thumb-wrap" :class="{ chosen: current === i }">
         <button type="button" :aria-label="`Ảnh ${i + 1}`" @click="photo = i"><PrivatePhoto :url="p.url" alt="" /></button>
-        <button v-if="mine" type="button" class="thumb-remove" aria-label="Xóa ảnh" :disabled="state.busy" @click="removePhoto(p)"><X :size="12" /></button>
+        <button type="button" class="thumb-remove" aria-label="Xóa ảnh" :disabled="state.busy" @click="removePhoto(p)"><X :size="12" /></button>
       </span>
-      <template v-if="mine">
-        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple :disabled="state.busy" @change="addPhotos" /></label>
-        <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
-      </template>
+      <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple :disabled="state.busy" @change="addPhotos" /></label>
+      <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
     </div>
     <PhotoViewer v-if="viewing" :urls="memory.photos.map(p => p.url)" :start="current" private @close="viewing = false" />
     <section class="sheet-section">
