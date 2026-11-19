@@ -46,6 +46,7 @@ function save() {
       progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
     }
     await api('memories/', { method: 'POST', body: { ...form.value, staged_photos: photos.value.map(p => p.token) } })
+    if (total) await new Promise(resolve => setTimeout(resolve, 700)) // let "5/5 · 100%" be seen
     photos.value.forEach(p => URL.revokeObjectURL(p.url))
     photos.value = []
     await load()

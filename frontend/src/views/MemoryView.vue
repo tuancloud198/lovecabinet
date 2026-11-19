@@ -45,6 +45,7 @@ function addPhotos(event) {
         await upload('photos/', body, part => { progress.value.part = part })
         progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
       }
+      await new Promise(resolve => setTimeout(resolve, 700)) // let "5/5 · 100%" be seen
     } finally {
       await load() // show whatever was uploaded, even if a later photo failed
     }
