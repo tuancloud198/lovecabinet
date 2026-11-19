@@ -203,7 +203,7 @@ class WorkflowTests(APITestCase):
     def test_heic_upload_is_stored_as_jpeg(self, storage):
         memory = self.setup_memory()
         data = BytesIO()
-        Image.new('RGB', (16, 16), 'red').save(data, format='HEIF')
+        Image.new('RGB', (5000, 200), 'red').save(data, format='HEIF')
         response = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('IMG_0001.HEIC', data.getvalue(), content_type='image/heic')}, format='multipart')
         self.assertEqual(response.status_code, 201)
         photo = Photo.objects.get(pk=response.data['id'])
@@ -211,7 +211,50 @@ class WorkflowTests(APITestCase):
         self.assertRegex(photo.object_key, r'\.jpg$')
         fileobj, _, _ = storage.return_value.upload_fileobj.call_args.args
         self.assertEqual(storage.return_value.upload_fileobj.call_args.kwargs['ExtraArgs'], {'ContentType': 'image/jpeg'})
-        self.assertEqual(Image.open(fileobj).format, 'JPEG')
+        stored = Image.open(fileobj)
+        self.assertEqual((stored.format, stored.width), ('JPEG', 4096))  # downscaled to MAX_SIDE
+    @patch('photos.services.storage')
+    def test_memory_created_only_with_all_staged_photos(self, storage):
+        self.pair()
+        cabinet = Cabinet.objects.get()
+        jar = self.client.post('/api/jars/', {'cabinet': cabinet.pk, 'name': 'Du lịch'}).data['id']
+        data = BytesIO()
+        Image.new('RGB', (8, 8)).save(data, format='PNG')
+        tokens = []
+        for i in range(2):
+            response = self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile(f'{i}.png', data.getvalue(), content_type='image/png')}, format='multipart')
+            self.assertEqual(response.status_code, 201)
+            tokens.append(response.data['token'])
+        staged_key = storage.return_value.upload_fileobj.call_args.args[2]
+        self.assertTrue(staged_key.startswith('staging/'))
+        self.assertFalse(Memory.objects.exists())  # nothing saved yet
+        body = {'jar': jar, 'title': 'Đà Lạt', 'date': '2026-11-19', 'staged_photos': tokens}
+        # A tampered token is rejected and no memory is created.
+        response = self.client.post('/api/memories/', {**body, 'staged_photos': [tokens[0], tokens[1] + 'x']}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Memory.objects.exists())
+        # Storage failing mid-way rolls the memory back and removes the copies made so far.
+        storage.return_value.copy_object.side_effect = [None, RuntimeError('s3 down')]
+        with self.assertRaises(RuntimeError):
+            self.client.post('/api/memories/', body, format='json')
+        self.assertFalse(Memory.objects.exists())
+        self.assertFalse(Photo.objects.exists())
+        self.assertEqual(storage.return_value.delete_object.call_count, 1)
+        storage.return_value.copy_object.side_effect = None
+        storage.return_value.delete_object.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post('/api/memories/', body, format='json')
+        self.assertEqual(response.status_code, 201)
+        memory = Memory.objects.get()
+        self.assertEqual(len(response.data['photos']), 2)
+        for photo in memory.photos.all():
+            self.assertRegex(photo.object_key, rf'^{jar}/{memory.pk}/[0-9a-f]{{32}}\.png$')
+        deleted = {c.kwargs['Key'] for c in storage.return_value.delete_object.call_args_list}
+        self.assertEqual(len(deleted), 2)
+        self.assertTrue(all(k.startswith('staging/') for k in deleted))
+        # Tokens are bound to the uploader.
+        self.auth(self.other)
+        self.assertEqual(self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('x.png', data.getvalue(), content_type='image/png')}, format='multipart').status_code, 400)  # not paired
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

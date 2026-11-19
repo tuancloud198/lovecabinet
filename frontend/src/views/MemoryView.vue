@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Camera, Heart, ImagePlus, Send, Trash2, X } from 'lucide-vue-next'
-import { api } from '@/api.js'
+import { api, upload } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
 import { forgetPhoto, uploadablePhoto } from '@/photos.js'
 import { state, navigate, run, load, toast } from '@/store.js'
@@ -9,12 +9,14 @@ import AppHeader from '@/components/AppHeader.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
+import UploadProgress from '@/components/UploadProgress.vue'
 
 const props = defineProps({ id: Number })
 const memory = computed(() => state.memories.find(m => m.id === props.id))
 const photo = ref(0)
 const current = computed(() => Math.min(photo.value, Math.max(0, (memory.value?.photos.length || 1) - 1)))
 const viewing = ref(false)
+const progress = ref(null) // { done, total, part } while adding photos
 const comment = ref('')
 const member = id => state.couple.members.find(m => m.id === id)
 const back = () => navigate('jar', { id: memory.value?.jar })
@@ -34,12 +36,14 @@ function addPhotos(event) {
   event.target.value = ''
   if (!files.length) return
   run(async () => {
+    progress.value = { done: 0, total: files.length, part: 0 }
     try {
       for (const file of files) {
         const body = new FormData()
         body.append('memory', props.id)
         body.append('file', await uploadablePhoto(file))
-        await api('photos/', { method: 'POST', body })
+        await upload('photos/', body, part => { progress.value.part = part })
+        progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
       }
     } finally {
       await load() // show whatever was uploaded, even if a later photo failed
@@ -87,6 +91,7 @@ function remove() {
       <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple :disabled="state.busy" @change="addPhotos" /></label>
       <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
     </div>
+    <UploadProgress v-if="state.busy && progress" v-bind="progress" />
     <PhotoViewer v-if="viewing" :urls="memory.photos.map(p => p.url)" :start="current" private @close="viewing = false" />
     <section class="sheet-section">
       <h2 class="memory-title">{{ memory.emoji }} {{ memory.title }}</h2>

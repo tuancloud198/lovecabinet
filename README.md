@@ -55,7 +55,7 @@ backend/<app>/
 
 `common/services.py` supplies shared couple ownership checks and scoped writes. `common/api.py` supplies reusable viewset behavior. Each app's service layer uses these where applicable. Invitations lock user rows in a transaction to prevent double pairing. A membership is unique per user. Memories, jars, events and photographs are accessible only to the two members of their couple, including when a request changes a parent relation.
 
-Photo uploads accept verified JPEG, PNG, WebP and HEIC/HEIF files up to 10 MB each (HEIC/HEIF is converted to JPEG on upload, since most browsers cannot display it). The database stores object keys (`{jar id}/{memory id}/{random}.{ext}`; moved when a memory changes jar), while bytes live in MinIO. Photos are streamed through the authenticated API so the bucket and object URLs are never public. Deleting a cabinet, jar or memory removes its associated MinIO objects first. Keep database and object storage backups together; object deletion and relational transactions cannot be atomic across the two systems.
+Photo uploads accept verified JPEG, PNG, WebP and HEIC/HEIF files up to 80 MB each. The browser converts HEIC/HEIF and photos over 3 MB to a JPEG of at most 4096 px before upload when it can decode them; otherwise the server converts HEIC/HEIF to JPEG (same size cap), since most browsers cannot display it. The database stores object keys (`{jar id}/{memory id}/{random}.{ext}`; moved when a memory changes jar), while bytes live in MinIO. Photos are streamed through the authenticated API so the bucket and object URLs are never public. Deleting a cabinet, jar or memory removes its associated MinIO objects first. Keep database and object storage backups together; object deletion and relational transactions cannot be atomic across the two systems.
 
 ## API
 
@@ -76,6 +76,7 @@ All routes use `/api/` and trailing slashes. Except registration/login, send `Au
 | `memories/<id>/comment/` | POST `{ "text": "..." }` |
 | `memories/<id>/react/` | POST; toggle heart |
 | `photos/` | POST multipart `memory` ID and `file` |
+| `photos/stage/` | POST multipart `file` before the memory exists; returns a `token` (valid 24 h). Send the tokens as `staged_photos` when creating the memory: it is created only together with all its photos (objects move from `staging/{user id}/` to `{jar id}/{memory id}/`). Abandoned `staging/` objects are not removed automatically; an S3 lifecycle rule on that prefix (e.g. expire after 2 days) cleans them up. |
 | `photos/<id>/content/` | GET authenticated image stream |
 | `photos/<id>/` | DELETE object and metadata |
 

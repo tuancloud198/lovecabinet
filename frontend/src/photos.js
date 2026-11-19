@@ -26,23 +26,32 @@ export function clearPhotos() {
   for (const url of [...cache.keys()]) forgetPhoto(url)
 }
 
-// HEIC/HEIF (iPhone): browsers that can decode it (Safari) convert it to JPEG before
-// upload, so the server never has to. Elsewhere the original is sent and the server converts.
-const MAX_PIXELS = 16_000_000 // iOS Safari refuses larger canvases
+// Before upload, convert HEIC/HEIF and large photos to a JPEG of at most MAX_SIDE px on
+// the long edge, so phones send a few MB instead of 10-20 MB and the server rarely has
+// to decode HEIF. If the browser can't decode the file (e.g. HEIF outside Safari), the
+// original is sent and the server converts it.
+const MAX_SIDE = 4096 // also keeps the canvas under iOS Safari's size limit
+const SMALL_ENOUGH = 3 * 1024 * 1024
+const isHeif = file => /^image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)
 export async function uploadablePhoto(file) {
-  if (!/^image\/hei[cf]/i.test(file.type) && !/\.hei[cf]$/i.test(file.name)) return file
+  const heif = isHeif(file)
+  if (!heif && (file.size <= SMALL_ENOUGH || !/^image\/(jpeg|png|webp)$/.test(file.type))) return file
   const url = URL.createObjectURL(file)
   try {
     const img = new Image()
     img.src = url
-    await img.decode() // rejects when the browser can't read HEIF
-    const scale = Math.min(1, Math.sqrt(MAX_PIXELS / (img.naturalWidth * img.naturalHeight)))
+    await img.decode() // rejects when the browser can't read the format
+    const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(img.naturalWidth * scale)
     canvas.height = Math.round(img.naturalHeight * scale)
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-    return blob ? new File([blob], file.name.replace(/\.[^.]*$/, '') + '.jpg', { type: 'image/jpeg' }) : file
+    const context = canvas.getContext('2d')
+    context.fillStyle = '#fff' // JPEG has no transparency
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88))
+    if (!blob || (!heif && blob.size >= file.size)) return file
+    return new File([blob], file.name.replace(/\.[^.]*$/, '') + '.jpg', { type: 'image/jpeg' })
   } catch {
     return file
   } finally {

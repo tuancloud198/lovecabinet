@@ -2,6 +2,9 @@ import uuid
 import boto3
 from botocore.config import Config
 from django.conf import settings
+from django.core import signing
+from django.db import transaction
+from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from common.services import couple_for
 from memories.models import Memory
@@ -25,6 +28,46 @@ def upload_photo(user, memory_id, upload):
     except Exception:
         client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
         raise
+
+STAGE_SALT = 'photos.stage'
+STAGE_MAX_AGE = 24 * 3600
+
+def stage_photo(user, upload):
+    """Upload a photo before its memory exists (so a memory is only created once all its
+    photos are uploaded). Returns a signed token naming the staged object."""
+    couple_for(user)
+    key = f'staging/{user.pk}/{uuid.uuid4().hex}.{EXTENSIONS[upload.content_type]}'
+    storage().upload_fileobj(upload, settings.MINIO_BUCKET, key, ExtraArgs={'ContentType': upload.content_type})
+    return signing.dumps({'key': key, 'type': upload.content_type, 'user': user.pk}, salt=STAGE_SALT)
+
+def read_staged(token, user):
+    try:
+        data = signing.loads(token, salt=STAGE_SALT, max_age=STAGE_MAX_AGE)
+    except signing.BadSignature:  # includes SignatureExpired
+        raise ValidationError('Ảnh tải lên đã hết hạn, vui lòng chọn lại ảnh.')
+    if data.get('user') != user.pk or data.get('type') not in EXTENSIONS:
+        raise ValidationError('Ảnh tải lên không hợp lệ.')
+    return data
+
+def attach_staged(memory, staged):
+    """Move staged objects to {jar id}/{memory id}/… and create their Photo rows. Call inside
+    the transaction that saves the memory: on failure the copies are removed and it rolls back."""
+    client = storage()
+    copied = []
+    try:
+        for item in staged:
+            key = object_key(memory, item['type'])
+            client.copy_object(Bucket=settings.MINIO_BUCKET, Key=key, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': item['key']})
+            copied.append(key)
+            Photo.objects.create(memory=memory, object_key=key, content_type=item['type'])
+    except Exception:
+        for key in copied:
+            client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
+        raise
+    def remove_staged():
+        for item in staged:
+            client.delete_object(Bucket=settings.MINIO_BUCKET, Key=item['key'])
+    transaction.on_commit(remove_staged)
 
 def relocate_photos(memory):
     """After a memory moves to another jar, move its objects so keys stay {jar id}/{memory id}/…."""

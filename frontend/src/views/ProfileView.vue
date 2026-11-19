@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { LogOut, Pencil } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { displayDate } from '@/format.js'
@@ -9,6 +9,10 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import UserTag from '@/components/UserTag.vue'
 
+// Release check: both versions are the image tags, so after a deploy you can see it went live.
+const frontendVersion = import.meta.env.VITE_APP_VERSION || 'dev'
+const backendVersion = ref('…')
+onMounted(() => api('auth/config/').then(data => { backendVersion.value = data.version || 'dev' }).catch(() => { backendVersion.value = '?' }))
 const editing = ref(false)
 const form = ref({})
 function startEdit() {
@@ -57,6 +61,7 @@ function save() {
       </div>
     </section>
     <button class="btn outline block" :disabled="state.busy" @click="signOut"><LogOut :size="18" /> Đăng xuất</button>
+    <p class="app-version">Phiên bản giao diện {{ frontendVersion }} · máy chủ {{ backendVersion }}</p>
 
     <BottomSheet v-if="editing" title="Hồ sơ của bạn ♡" @close="editing = false">
       <form class="stack" @submit.prevent="save">

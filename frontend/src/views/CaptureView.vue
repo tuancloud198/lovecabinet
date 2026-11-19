@@ -1,22 +1,23 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { Amphora, Camera, ImagePlus, X } from 'lucide-vue-next'
-import { api } from '@/api.js'
+import { api, upload } from '@/api.js'
 import { isoDate } from '@/format.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import UploadProgress from '@/components/UploadProgress.vue'
 import { uploadablePhoto } from '@/photos.js'
 
 const props = defineProps({ jarId: Number })
 const jars = computed(() => [...state.jars].sort((a, b) => b.id - a.id))
 const form = ref({ jar: props.jarId || jars.value[0]?.id, title: '', story: '', date: isoDate(), emoji: '❤️' })
-const photos = ref([]) // [{ file, url }]
+const photos = ref([]) // [{ file, url, token? }]; token = already uploaded (staged)
 const current = ref(0)
 const viewing = ref(false)
-const savedId = ref(null) // memory saved but some photos still pending
+const progress = ref(null) // { done, total, part } while uploading
 
 function pick(event) {
   for (const file of event.target.files) photos.value.push({ file, url: URL.createObjectURL(file) })
@@ -30,16 +31,23 @@ function drop(index) {
 }
 onBeforeUnmount(() => photos.value.forEach(p => URL.revokeObjectURL(p.url)))
 
+// Upload every photo first (staged), then create the memory with all of them in one
+// request, so a failed upload never leaves a memory with missing photos. Already
+// uploaded photos keep their token, so a retry only sends the rest.
 function save() {
   run(async () => {
-    if (!savedId.value) savedId.value = (await api('memories/', { method: 'POST', body: form.value })).id
-    while (photos.value.length) {
+    const total = photos.value.length
+    progress.value = { done: photos.value.filter(p => p.token).length, total, part: 0 }
+    for (const p of photos.value) {
+      if (p.token) continue
       const body = new FormData()
-      body.append('memory', savedId.value)
-      body.append('file', await uploadablePhoto(photos.value[0].file))
-      await api('photos/', { method: 'POST', body })
-      drop(0)
+      body.append('file', await uploadablePhoto(p.file))
+      p.token = (await upload('photos/stage/', body, part => { progress.value.part = part })).token
+      progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
     }
+    await api('memories/', { method: 'POST', body: { ...form.value, staged_photos: photos.value.map(p => p.token) } })
+    photos.value.forEach(p => URL.revokeObjectURL(p.url))
+    photos.value = []
     await load()
     toast('Đã lưu vào Tủ! ♡')
     navigate('jar', { id: form.value.jar })
@@ -50,7 +58,7 @@ function save() {
 <template>
   <div class="page">
     <AppHeader title="Lưu kỷ niệm" back @back="navigate('cabinet')">
-      <label class="date-pill"><span class="visually-hidden">Ngày</span><input v-model="form.date" type="date" required :disabled="!!savedId" /></label>
+      <label class="date-pill"><span class="visually-hidden">Ngày</span><input v-model="form.date" type="date" required /></label>
     </AppHeader>
 
     <EmptyState v-if="!jars.length" title="Chưa có hũ nào" text="Tạo một chiếc hũ trong Tủ trước, rồi quay lại lưu kỷ niệm nhé!">
@@ -69,7 +77,7 @@ function save() {
             <label class="btn primary small"><Camera :size="16" /> Chụp ảnh<input type="file" accept="image/*" capture="environment" @change="pick" /></label>
             <label class="btn outline small"><ImagePlus :size="16" /> Thư viện<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple @change="pick" /></label>
           </div>
-          <small>JPEG, PNG, WebP, HEIC · tối đa 10 MB/ảnh</small>
+          <small>JPEG, PNG, WebP, HEIC · tối đa 80 MB/ảnh</small>
         </div>
       </div>
       <div v-if="photos.length" class="thumb-strip">
@@ -84,17 +92,17 @@ function save() {
 
       <section class="sheet-section stack">
         <div class="field"><span class="field-title">Chọn emoji cho kỷ niệm này</span><EmojiPicker v-model="form.emoji" /></div>
-        <label class="field">Tên kỷ niệm<input v-model="form.title" required maxlength="150" placeholder="Buổi cà phê đầu tiên…" :disabled="!!savedId" /></label>
+        <label class="field">Tên kỷ niệm<input v-model="form.title" required maxlength="150" placeholder="Buổi cà phê đầu tiên…" /></label>
         <label class="field"><span class="label-text">Lời nhắn <span class="muted">(tùy chọn)</span></span>
-          <textarea v-model="form.story" maxlength="200" rows="3" placeholder="Một buổi cà phê thật chill cùng nhau ♡" :disabled="!!savedId"></textarea>
+          <textarea v-model="form.story" maxlength="200" rows="3" placeholder="Một buổi cà phê thật chill cùng nhau ♡"></textarea>
           <span class="counter">{{ form.story.length }}/200</span>
         </label>
         <label class="field">Chọn hũ
-          <select v-model="form.jar" required :disabled="!!savedId"><option v-for="j in jars" :key="j.id" :value="j.id">{{ j.emoji }} {{ j.name }}</option></select>
+          <select v-model="form.jar" required><option v-for="j in jars" :key="j.id" :value="j.id">{{ j.emoji }} {{ j.name }}</option></select>
         </label>
-        <p v-if="savedId" class="form-error">Kỷ niệm đã được lưu, còn {{ photos.length }} ảnh chưa tải lên. Bấm lưu để thử lại.</p>
         <p v-if="state.error" class="form-error" role="alert">{{ state.error }}</p>
         <button class="btn primary block" :disabled="state.busy"><Amphora :size="18" /> {{ state.busy ? 'Đang lưu…' : 'Lưu vào Tủ' }}</button>
+        <UploadProgress v-if="state.busy && progress?.total" v-bind="progress" />
       </section>
     </form>
   </div>

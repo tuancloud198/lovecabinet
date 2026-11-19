@@ -6,6 +6,9 @@
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /bin/uv
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Shown in the app (Profile) to check which release is running: --build-arg APP_VERSION=0.2.4
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 WORKDIR /app
 COPY backend/requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt

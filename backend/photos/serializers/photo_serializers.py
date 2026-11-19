@@ -9,6 +9,8 @@ from photos.models import Photo
 
 logger = logging.getLogger(__name__)
 register_heif_opener()  # lets Pillow read HEIC/HEIF (iPhone photos)
+MAX_UPLOAD_MB = 80  # full-size phone photos (HEIF, 48 MP, ProRAW-derived) can be large; browsers usually shrink them first
+MAX_SIDE = 4096  # long edge of a converted HEIF photo
 FORMATS = {'JPEG': 'image/jpeg', 'PNG': 'image/png', 'WEBP': 'image/webp'}
 
 class PhotoSerializer(serializers.ModelSerializer):
@@ -24,17 +26,17 @@ def heif_to_jpeg(upload):
     upload.seek(0)
     with Image.open(upload) as image:
         image = ImageOps.exif_transpose(image).convert('RGB')
+        image.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
         buffer = io.BytesIO()
-        image.save(buffer, 'JPEG', quality=90)
+        image.save(buffer, 'JPEG', quality=88)
     name = (upload.name or 'photo').rsplit('.', 1)[0] + '.jpg'
     return InMemoryUploadedFile(buffer, 'file', name, 'image/jpeg', buffer.getbuffer().nbytes, None)
 
-class UploadSerializer(serializers.Serializer):
-    memory = serializers.IntegerField(min_value=1)
+class StageSerializer(serializers.Serializer):
     file = serializers.FileField()
     def validate_file(self, upload):
-        if upload.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError('Chọn ảnh tối đa 10 MB.')
+        if upload.size > MAX_UPLOAD_MB * 1024 * 1024:
+            raise serializers.ValidationError(f'Chọn ảnh tối đa {MAX_UPLOAD_MB} MB.')
         header = upload.read(32)  # file signature, logged when the photo is rejected
         upload.seek(0)
         try:
@@ -51,3 +53,6 @@ class UploadSerializer(serializers.Serializer):
             raise serializers.ValidationError('Chỉ hỗ trợ ảnh JPEG, PNG, WebP và HEIC/HEIF hợp lệ.')
         upload.seek(0)
         return upload
+
+class UploadSerializer(StageSerializer):
+    memory = serializers.IntegerField(min_value=1)

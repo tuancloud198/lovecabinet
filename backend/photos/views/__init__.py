@@ -4,8 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from common.services import couple_for
 from photos.models import Photo
-from photos.serializers.photo_serializers import PhotoSerializer, UploadSerializer
-from photos.services import upload_photo, read_photo, delete_photo
+from photos.serializers.photo_serializers import PhotoSerializer, StageSerializer, UploadSerializer
+from photos.services import upload_photo, stage_photo, read_photo, delete_photo
 class PhotoViewSet(viewsets.GenericViewSet):
     serializer_class = PhotoSerializer
     def get_queryset(self):
@@ -15,6 +15,12 @@ class PhotoViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         photo = upload_photo(request.user, serializer.validated_data['memory'], serializer.validated_data['file'])
         return Response(PhotoSerializer(photo).data, status=201)
+    @action(detail=False, methods=['post'])
+    def stage(self, request):
+        """Upload a photo for a memory that isn't created yet; returns a token for `staged_photos`."""
+        serializer = StageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response({'token': stage_photo(request.user, serializer.validated_data['file'])}, status=201)
     @action(detail=True, methods=['get'])
     def content(self, request, pk=None):
         photo = self.get_object()

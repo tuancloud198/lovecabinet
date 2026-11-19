@@ -352,3 +352,10 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .google-signin .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
 .google-signin .divider::before, .google-signin .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
 .google-button { display: flex; justify-content: center; min-height: 44px; }
+
+/* Photo upload progress */
+.upload-progress { display: grid; gap: 6px; }
+.upload-progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.upload-progress-track { height: 8px; border-radius: 999px; background: var(--primary-light); overflow: hidden; }
+.upload-progress-bar { height: 100%; border-radius: inherit; background: var(--primary); transition: width .2s ease; }
+.app-version { text-align: center; font-size: 11px; color: var(--muted); margin-top: 12px; }

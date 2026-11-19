@@ -16,6 +16,7 @@ if os.environ.get('POSTGRES_HOST'):
 AUTH_USER_MODEL = 'users.User'
 # OAuth 2.0 Web client ID from Google Cloud Console; empty disables "Sign in with Google".
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+APP_VERSION = os.environ.get('APP_VERSION', 'dev')  # image tag, set at build time
 AUTH_PASSWORD_VALIDATORS = [{'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'}, {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'}, {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'}]
 REST_FRAMEWORK = {'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.TokenAuthentication'], 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'], 'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.AnonRateThrottle'], 'DEFAULT_THROTTLE_RATES': {'anon': '60/hour'}}
 # Reverse proxies in front of Django (compose: nginx = 1; EKS: ALB + nginx = 2). Lets the anonymous

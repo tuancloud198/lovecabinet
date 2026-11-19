@@ -51,3 +51,22 @@ export async function api(path, { method = 'GET', body } = {}) {
   if (!response.ok) throw new ApiError(describe(data), response.status)
   return data
 }
+
+// POST a FormData with upload progress (fetch can't report it). onProgress gets 0..1.
+export function upload(path, body, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/api/${path}`)
+    const token = getToken()
+    if (token) xhr.setRequestHeader('Authorization', `Token ${token}`)
+    xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress?.(event.loaded / event.total) }
+    xhr.onload = () => {
+      let data
+      try { data = JSON.parse(xhr.responseText) } catch { data = { detail: `Lỗi máy chủ (${xhr.status}).` } }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data)
+      else reject(new ApiError(describe(data), xhr.status))
+    }
+    xhr.onerror = () => reject(new ApiError('Mất kết nối mạng, vui lòng thử lại.', 0))
+    xhr.send(body)
+  })
+}

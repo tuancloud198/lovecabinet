@@ -29,7 +29,7 @@ def google(request):
 @permission_classes([AllowAny])
 def auth_config(request):
     """Public settings the sign-in screen needs (the Google client ID is public by design)."""
-    return Response({'google_client_id': settings.GOOGLE_CLIENT_ID})
+    return Response({'google_client_id': settings.GOOGLE_CLIENT_ID, 'version': settings.APP_VERSION})
 @api_view(['GET', 'PATCH'])
 def me(request):
     serializer = UserSerializer(request.user, data=request.data, partial=True) if request.method == 'PATCH' else UserSerializer(request.user)

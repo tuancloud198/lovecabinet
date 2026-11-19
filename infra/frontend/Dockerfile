@@ -6,7 +6,9 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
-RUN npm run build
+# Shown in the app (Profile) to check which release is running: --build-arg APP_VERSION=0.2.6
+ARG APP_VERSION=dev
+RUN VITE_APP_VERSION=$APP_VERSION npm run build
 
 FROM nginx:1.27-alpine
 ENV BACKEND_URL=http://backend:8000
