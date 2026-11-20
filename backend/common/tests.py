@@ -316,7 +316,7 @@ class GoogleLoginTests(APITestCase):
 
     @override_settings(GOOGLE_CLIENT_ID='')
     def test_disabled_without_client_id(self):
-        self.assertEqual(self.client.get('/api/auth/config/').data, {'google_client_id': ''})
+        self.assertEqual(self.client.get('/api/auth/config/').data, {'google_client_id': '', 'version': 'dev'})
         self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'id-token'}).status_code, 400)
 
     @patch('google.oauth2.id_token.verify_oauth2_token')
@@ -326,4 +326,4 @@ class GoogleLoginTests(APITestCase):
         self.assertEqual(self.client.post('/api/auth/google/', {'credential': 'id-token'}).status_code, 503)
 
     def test_config_exposes_client_id(self):
-        self.assertEqual(self.client.get('/api/auth/config/').data, {'google_client_id': 'test-client.apps.googleusercontent.com'})
+        self.assertEqual(self.client.get('/api/auth/config/').data, {'google_client_id': 'test-client.apps.googleusercontent.com', 'version': 'dev'})

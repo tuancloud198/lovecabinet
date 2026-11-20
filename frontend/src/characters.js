@@ -43,6 +43,8 @@ export const PET_SPECIES = [
   { key: 'dog', label: 'Cún', baby: 'Cún con' },
   { key: 'cat', label: 'Mèo', baby: 'Mèo con' },
   { key: 'capybara', label: 'Capybara', baby: 'Capy con' },
+  { key: 'honey_badger', label: 'Lửng mật', baby: 'Lửng con' },
+  { key: 'hamster', label: 'Hamster', baby: 'Hamster con' },
 ]
 
 /** Stage name for a species: the first stage is 'Cún con' / 'Mèo con' / 'Capy con'. */
