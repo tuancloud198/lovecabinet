@@ -1,9 +1,11 @@
 <script setup>
-// The couple's pet. Dogs use the character art cropped from task/ui-source; cats and capybaras
-// are drawn here in the same style (thick dark outline, rosy cheeks, grass patch). The capybara is a
-// chubby sitting capy: wide flat-topped head, big boxy muzzle, small bead eyes, mandarin on top.
-// The honey badger is dark with its silver-white cape over the head and shoulders, and white claws.
-// The hamster is a chubby golden ball with puffy cream cheeks, holding a sunflower seed.
+// The couple's pet. Hand-drawn art is used when it exists in src/assets/characters, named
+//   <species>-1|2|3 (growth stages, full body) and <species>-neutral|happy|shy|excited (faces),
+// e.g. capybara-2.webp, capybara-happy.webp (the dog's files are male-*). Transparent background,
+// drawn like task/ui-source/Dog-Growth.png. Until a species has its art, it is drawn below.
+// The fallback drawings follow the dog's design: facing right in 3/4 view, sitting, big head,
+// sleepy half-lidded eyes, smirk with the tongue out when happy, peach blush, thick dark outline,
+// soft warm shading, an accessory on the head, a grass patch and yellow sparkle lines.
 import { computed } from 'vue'
 import { art } from '@/characters.js'
 
@@ -14,158 +16,188 @@ const props = defineProps({
   face: Boolean,                              // head only (avatars, chips)
 })
 
-const OUTLINE = '#3B2A22'
-const PALETTES = {
-  cat: { body: '#F7C98B', belly: '#FFF1DC', mark: '#DE9650', ear: '#F6A9A3' },
-  hamster: { body: '#F2BE4E', belly: '#FFF2D6', mark: '#D99A2B', ear: '#F2BE4E', muzzle: '#FFF2D6', paw: '#F7B9A8' },
-  honey_badger: { body: '#4E4948', cape: '#ECE6DA', belly: '#6A6462', mark: '#3A3635', ear: '#4E4948', muzzle: '#857D7A', paw: '#3A3635' },
-  capybara: { body: '#C58A57', belly: '#E6BC8F', mark: '#8A5833', ear: '#8A5833', muzzle: '#D8A271', paw: '#9E6A41' },
+const INK = '#2E1F17'
+const SPECIES = {
+  cat: {
+    fur: '#F8D3A0', light: '#FFF0D9', shade: '#E9B47A', mark: '#E39A57', belly: '#FFF3E2', paw: '#FFF3E2',
+    eyes: { bx: -5, fx: 16, y: -7 }, mouth: { x: 30, y: 17 }, blush: { x: 16, y: 10 },
+  },
+  capybara: {
+    fur: '#D49A64', light: '#E8BC8C', shade: '#B67B47', mark: '#9C6338', belly: '#E6BB8C', paw: '#A9703F',
+    eyes: { bx: -9, fx: 12, y: -15 }, mouth: { x: 40, y: 20 }, blush: { x: 18, y: 4 },
+  },
+  honey_badger: {
+    fur: '#5A5453', light: '#78716F', shade: '#423D3C', mark: '#ECE6DA', belly: '#6E6765', paw: '#3E3938',
+    eyes: { bx: -7, fx: 14, y: -5 }, mouth: { x: 36, y: 16 }, blush: { x: 15, y: 9 },
+  },
+  hamster: {
+    fur: '#F4C35C', light: '#FFE3A1', shade: '#E2A43E', mark: '#D68F2A', belly: '#FFF4DC', paw: '#F6B7A6',
+    eyes: { bx: -6, fx: 15, y: -9 }, mouth: { x: 30, y: 13 }, blush: { x: 15, y: 7 },
+  },
 }
-const c = computed(() => PALETTES[props.species])
-const bodyScale = computed(() => [0.7, 0.85, 1][props.stage] ?? 1)
-const headScale = computed(() => [0.9, 0.95, 1][props.stage] ?? 1)
-// Body is drawn for an adult standing on y = 160 with its neck at y = 100.
-const headY = computed(() => 160 - 60 * bodyScale.value - 26 * headScale.value + (props.species === 'capybara' ? 6 : 0))
-// Capybara and honey badger have small bead eyes; the badger's dark fur needs light eye lines.
-const beady = computed(() => ['capybara', 'honey_badger', 'hamster'].includes(props.species))
-const EYES = { honey_badger: { x: 17, y: -4, ink: '#F1ECE2' }, hamster: { x: 19, y: -9, ink: OUTLINE } }
-const eye = computed(() => EYES[props.species] ?? { x: 24, y: -15, ink: OUTLINE })
+const s = computed(() => SPECIES[props.species] ?? SPECIES.cat)
+const artFile = computed(() => {
+  const prefix = props.species === 'dog' ? 'male' : props.species
+  return art[props.face ? `${prefix}-${props.mood}` : `${prefix}-${props.stage + 1}`]
+})
+const id = computed(() => `pet-${props.species}`) // gradient ids (same species => same defs, safe to repeat)
+const bodyScale = computed(() => [0.74, 0.87, 1][props.stage] ?? 1)
+const headScale = computed(() => [0.92, 0.96, 1][props.stage] ?? 1)
+// Body is drawn for an adult sitting on y = 152; the head sits on its shoulders.
+const head = computed(() => {
+  const drop = props.species === 'hamster' ? 10 : props.species === 'honey_badger' ? 8 : 0
+  return { x: 100 + 8 * bodyScale.value, y: 152 - 92 * bodyScale.value + drop }
+})
+const sleepy = computed(() => props.mood === 'neutral' || props.mood === 'shy')
 const openMouth = computed(() => props.mood === 'happy' || props.mood === 'excited')
+const RX = 10
+const RY = 8.5
+// Upper half of an eye, filled with fur and edged with a heavy lid line (the dog's "chill" look).
+const lid = x => `M${x - RX - 1} ${s.value.eyes.y}a${RX + 1} ${RY + 1} 0 0 1 ${2 * RX + 2} 0Z`
 </script>
 
 <template>
-  <img v-if="species === 'dog'" class="pet-art" :src="art[face ? `male-${mood}` : `male-${stage + 1}`]" alt="" />
-  <svg v-else class="pet-art" :viewBox="face ? '-52 -66 104 104' : '30 4 140 166'" aria-hidden="true"
-       :stroke="OUTLINE" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
-    <!-- Ground, body and tail (full figure only) -->
+  <img v-if="artFile" class="pet-art" :src="artFile" alt="" />
+  <svg v-else class="pet-art" :viewBox="face ? '-52 -64 126 108' : '26 0 164 166'" aria-hidden="true"
+       :stroke="INK" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round">
+    <defs>
+      <radialGradient :id="`${id}-fur`" cx="35%" cy="30%" r="80%">
+        <stop offset="0" :stop-color="s.light" /><stop offset=".55" :stop-color="s.fur" /><stop offset="1" :stop-color="s.shade" />
+      </radialGradient>
+    </defs>
+
+    <!-- Grass, body, legs and tail (full figure only) -->
     <g v-if="!face">
-      <ellipse cx="100" cy="161" rx="66" ry="8" fill="#D3E6B0" stroke="none" />
-      <path d="M44 160q2-10 6-14M52 160q0-7 4-10M150 160q-1-9-6-13M158 160q0-6-3-9" stroke="#9CC46B" stroke-width="3" fill="none" />
-      <g :transform="`translate(100 160) scale(${bodyScale}) translate(-100 -160)`">
+      <ellipse cx="104" cy="154" rx="70" ry="9" fill="#DCEDB8" stroke="none" />
+      <path d="M44 154q1-9 5-13M50 155q1-6 4-9M158 154q-1-10-6-14M165 155q0-6-3-9M134 157q2-6 6-8" stroke="#93C462" stroke-width="3.2" fill="none" />
+      <g :transform="`translate(100 152) scale(${bodyScale}) translate(-100 -152)`">
+        <!-- tail, behind the body -->
         <template v-if="species === 'cat'">
-          <path d="M126 150c32 2 34-32 20-38" fill="none" :stroke="OUTLINE" stroke-width="15" />
-          <path d="M126 150c32 2 34-32 20-38" fill="none" :stroke="c.body" stroke-width="8" />
-          <path d="M70 160c-6-32 6-58 30-60 24 2 36 28 30 60Z" :fill="c.body" />
-          <path d="M86 160c-2-24 6-40 14-40s16 16 14 40Z" :fill="c.belly" stroke="none" />
-          <path d="M73 128q7 2 9 9M127 128q-7 2-9 9M75 142q6 1 8 6M125 142q-6 1-8 6" :stroke="c.mark" fill="none" />
-          <ellipse cx="88" cy="157" rx="10" ry="6" :fill="c.body" /><ellipse cx="112" cy="157" rx="10" ry="6" :fill="c.body" />
-          <path d="M85 155v4M91 155v4M109 155v4M115 155v4" stroke-width="1.8" />
+          <path d="M66 140c-26 0-30-30-14-42" fill="none" :stroke="INK" stroke-width="15" />
+          <path d="M66 140c-26 0-30-30-14-42" fill="none" :stroke="s.fur" stroke-width="8" />
+          <path d="M53 104l4-5M50 112l6-3" :stroke="s.mark" stroke-width="3" fill="none" />
         </template>
-        <template v-else-if="species === 'hamster'">
-          <path d="M52 160c-8-34 12-60 48-62 36 2 56 28 48 62Z" :fill="c.body" />
-          <path d="M70 160c-4-26 10-42 30-42s34 16 30 42Z" :fill="c.belly" stroke="none" />
-          <!-- sunflower seed held in both paws -->
-          <path d="M100 122c7 4 8 16 0 22-8-6-7-18 0-22Z" fill="#4A4342" stroke-width="2.5" /><path d="M100 126v14" stroke="#E8E1D6" stroke-width="2" />
-          <ellipse cx="86" cy="138" rx="6.5" ry="7.5" :fill="c.paw" /><ellipse cx="114" cy="138" rx="6.5" ry="7.5" :fill="c.paw" />
-          <ellipse cx="80" cy="157" rx="11" ry="5.5" :fill="c.paw" /><ellipse cx="120" cy="157" rx="11" ry="5.5" :fill="c.paw" />
-          <path d="M77 154v4M83 154v4M117 154v4M123 154v4" stroke-width="1.6" />
+        <path v-else-if="species === 'honey_badger'" d="M64 136c-14 2-22-6-20-16 6 2 12 4 22 6Z" :fill="s.fur" />
+
+        <!-- sitting torso (hamster: a round ball) -->
+        <ellipse v-if="species === 'hamster'" cx="100" cy="120" rx="44" ry="36" :fill="`url(#${id}-fur)`" />
+        <path v-else-if="species === 'capybara'" d="M90 80c-30 6-42 36-38 72h90c4-30-6-60-30-70Z" :fill="`url(#${id}-fur)`" />
+        <path v-else-if="species === 'honey_badger'" d="M92 86c-28 6-40 34-36 66h86c4-28-6-56-30-66Z" :fill="`url(#${id}-fur)`" />
+        <path v-else d="M96 84c-22 8-36 34-32 68h70c4-26-2-52-16-66Z" :fill="`url(#${id}-fur)`" />
+
+        <!-- belly / markings -->
+        <path v-if="species === 'hamster'" d="M84 150c-10-16-6-36 14-40 22-2 32 16 24 40Z" :fill="s.belly" stroke="none" />
+        <path v-else-if="species === 'capybara'" d="M106 152c-4-22 2-46 16-60 14 14 20 38 16 60Z" :fill="s.belly" stroke="none" />
+        <path v-else-if="species === 'cat'" d="M104 152c-4-20 0-40 12-54 10 14 14 34 12 54Z" :fill="s.belly" stroke="none" />
+        <template v-if="species === 'honey_badger'">
+          <!-- silver cape along the top of the back -->
+          <path d="M60 128c2-22 14-38 32-42l14 4c-16 8-28 20-34 40Z" :fill="s.mark" stroke="none" />
+          <path d="M92 86c-28 6-40 34-36 66" fill="none" />
         </template>
-        <template v-else-if="species === 'honey_badger'">
-          <path d="M140 152c14-1 19-12 14-19" fill="none" :stroke="OUTLINE" stroke-width="13" />
-          <path d="M140 152c14-1 19-12 14-19" fill="none" :stroke="c.body" stroke-width="6" />
-          <path d="M56 160c-6-30 10-56 44-58 34 2 50 28 44 58Z" :fill="c.body" />
-          <!-- silver cape over the shoulders (outline redrawn on top) -->
-          <path d="M59 132c5-19 19-29 41-30 22 1 36 11 41 30-10-9-24-13-41-13s-31 4-41 13Z" :fill="c.cape" stroke="none" />
-          <path d="M56 160c-6-30 10-56 44-58 34 2 50 28 44 58" fill="none" />
-          <path d="M80 160c-2-20 8-32 20-32s22 12 20 32Z" :fill="c.belly" stroke="none" />
-          <ellipse cx="86" cy="138" rx="7" ry="9" :fill="c.body" /><ellipse cx="114" cy="138" rx="7" ry="9" :fill="c.body" />
-          <ellipse cx="77" cy="157" rx="13" ry="6" :fill="c.paw" /><ellipse cx="123" cy="157" rx="13" ry="6" :fill="c.paw" />
-          <!-- the famous claws -->
-          <path d="M82 146l-1 4M86 147v4M90 146l1 4M110 146l-1 4M114 147v4M118 146l1 4M70 160l-2 3M76 161v3M82 160l2 3M118 160l-2 3M124 161v3M130 160l2 3" :stroke="c.cape" stroke-width="2" />
+        <template v-if="species === 'cat'">
+          <path d="M70 118q8 2 10 9M68 132q8 1 10 7" :stroke="s.mark" stroke-width="3" fill="none" />
+        </template>
+        <template v-if="species === 'capybara'">
+          <path d="M64 110q6-4 12-4M60 126q6-3 12-2" :stroke="s.mark" stroke-width="2.6" fill="none" />
+        </template>
+
+        <!-- back haunch and foot -->
+        <ellipse v-if="species !== 'hamster'" cx="78" cy="136" rx="21" ry="16" :fill="s.fur" />
+        <ellipse :cx="species === 'hamster' ? 82 : 74" cy="151" rx="13" ry="5.5" :fill="species === 'hamster' ? s.paw : s.fur" />
+
+        <!-- front legs (hamster: paws holding a sunflower seed) -->
+        <template v-if="species === 'hamster'">
+          <path d="M108 112c8 4 9 16 0 22-8-6-7-18 0-22Z" fill="#4A4342" stroke-width="2.6" /><path d="M108 116v14" stroke="#E8E1D6" stroke-width="2" />
+          <ellipse cx="98" cy="126" rx="7" ry="8" :fill="s.paw" /><ellipse cx="118" cy="124" rx="7" ry="8" :fill="s.paw" />
+          <ellipse cx="118" cy="151" rx="13" ry="5.5" :fill="s.paw" />
         </template>
         <template v-else>
-          <!-- chubby sitting body, wider at the bottom -->
-          <path d="M50 160c-7-32 12-58 50-60 38 2 57 28 50 60Z" :fill="c.body" />
-          <path d="M74 160c-3-22 8-36 26-36s29 14 26 36Z" :fill="c.belly" stroke="none" />
-          <path d="M60 140q3-6 9-8M140 140q-3-6-9-8" :stroke="c.mark" stroke-width="2.4" fill="none" />
-          <!-- little front paws on the belly -->
-          <ellipse cx="86" cy="137" rx="7" ry="9" :fill="c.body" /><ellipse cx="114" cy="137" rx="7" ry="9" :fill="c.body" />
-          <path d="M83 144v-3M89 144v-3M111 144v-3M117 144v-3" stroke-width="1.6" />
-          <!-- feet -->
-          <ellipse cx="76" cy="157" rx="13" ry="6" :fill="c.paw" /><ellipse cx="124" cy="157" rx="13" ry="6" :fill="c.paw" />
-          <path d="M72 154v4M78 154v4M122 154v4M128 154v4" stroke-width="1.6" />
+          <!-- rounded front legs with toes, like the dog's -->
+          <path :d="`M104 ${species === 'capybara' ? 122 : 112}v24c0 6 3 8 8 8s8-2 8-8v-24`" :fill="s.fur" />
+          <path :d="`M121 ${species === 'capybara' ? 120 : 110}v26c0 6 3 8 8 8s8-2 8-8v-26`" :fill="s.fur" />
+          <path d="M109 150v3M114 150v3M126 150v3M131 150v3" stroke-width="2" />
+          <path v-if="species === 'honey_badger'" d="M106 152l-1 4M111 152v4M116 152l1 4M121 152l-1 4M126 152v4M131 152l1 4M66 154l-1 3M72 155v3M78 154l1 3" :stroke="s.mark" stroke-width="2.2" />
         </template>
+        <!-- honey badger's red bandana -->
+        <path v-if="species === 'honey_badger'" d="M92 90c10 6 26 6 36-2l-4 12c-6 4-12 6-18 6l-6 10-4-12c-4-4-5-8-4-14Z" fill="#E0574E" stroke-width="2.8" />
       </g>
-      <path v-if="mood === 'excited' || mood === 'happy'" :transform="`translate(0 ${headY - 78})`"
-            d="M44 52l8 6M40 66l10 2M58 40l3 9" stroke="#F5C12E" stroke-width="5" fill="none" />
+      <!-- sparkles for a happy pet, like the dog's -->
+      <path v-if="mood === 'happy' || mood === 'excited'" :transform="`translate(${head.x - 108} ${head.y - 60})`"
+            d="M150 18l6-9M160 28l9-5M144 10l1-9" stroke="#F5C12E" stroke-width="4.5" fill="none" />
     </g>
 
-    <!-- Head, centred on (0, 0) -->
-    <g :transform="face ? '' : `translate(100 ${headY}) scale(${headScale})`">
+    <!-- Head, centred on (0, 0), facing right -->
+    <g :transform="face ? '' : `translate(${head.x} ${head.y}) scale(${headScale})`">
       <template v-if="species === 'cat'">
-        <path d="M-37-12-33-52-9-31Z" :fill="c.body" /><path d="M37-12 33-52 9-31Z" :fill="c.body" />
-        <path d="M-31-20-29-43-15-30Z" :fill="c.ear" stroke="none" /><path d="M31-20 29-43 15-30Z" :fill="c.ear" stroke="none" />
-        <ellipse rx="43" ry="34" :fill="c.body" />
-        <path d="M-6-33v9M0-34v11M6-33v9" :stroke="c.mark" stroke-width="3" fill="none" />
-        <!-- pink bow on the left ear, like Cún Nón Lá's flower -->
-        <g transform="translate(-26 -36) rotate(-20)"><path d="M0 0-12-7v14ZM0 0l12-7v14Z" fill="#F28FA0" stroke-width="2" /><circle r="3.5" fill="#E86F86" stroke-width="2" /></g>
-        <path d="M-31 6h-14M-31 11l-13 5M31 6h14M31 11l13 5" stroke-width="1.8" fill="none" />
-        <path d="M-4 3h8l-4 4Z" fill="#E88A8A" stroke-width="2" />
+        <path d="M-30-12-28-50-6-30Z" :fill="s.fur" />
+        <path d="M2-30 22-54 32-16Z" :fill="s.fur" /><path d="M9-29 21-45 26-22Z" fill="#F6A9A3" stroke="none" />
+        <ellipse rx="38" ry="31" :fill="`url(#${id}-fur)`" />
+        <ellipse cx="30" cy="11" rx="17" ry="13" :fill="s.belly" stroke="none" />
+        <path d="M-12-29q2 6 0 11M-4-31q2 7 0 12M4-30q2 6 0 10" :stroke="s.mark" stroke-width="3" fill="none" />
+        <path d="M36 2h8l-4 5Z" fill="#E88A8A" stroke-width="2.2" />
+        <path d="M44 12l14-3M44 17l13 2" stroke-width="1.8" fill="none" />
+        <!-- pink bow on the back ear -->
+        <g transform="translate(-22 -38) rotate(-18)"><path d="M0 0-12-7v14ZM0 0l12-7v14Z" fill="#F28FA0" stroke-width="2.2" /><circle r="3.6" fill="#E86F86" stroke-width="2.2" /></g>
       </template>
-      <template v-else-if="species === 'hamster'">
-        <circle cx="-29" cy="-27" r="10" :fill="c.ear" /><circle cx="29" cy="-27" r="10" :fill="c.ear" />
-        <circle cx="-29" cy="-27" r="5" fill="#F7B9A8" stroke="none" /><circle cx="29" cy="-27" r="5" fill="#F7B9A8" stroke="none" />
-        <ellipse rx="44" ry="34" :fill="c.body" />
-        <!-- cream face with puffy cheek pouches -->
-        <path d="M-40 10c0-12 12-18 24-16 6-8 26-8 32 0 12-2 24 4 24 16 0 14-18 23-40 23s-40-9-40-23Z" :fill="c.belly" stroke="none" />
-        <path d="M-6-34q2 6 0 12M6-34q-2 6 0 12" :stroke="c.mark" stroke-width="2.4" fill="none" />
-        <ellipse cy="2" rx="4.5" ry="3.2" fill="#F08C8C" stroke-width="2" />
-      </template>
-      <template v-else-if="species === 'honey_badger'">
-        <circle cx="-33" cy="-19" r="7.5" :fill="c.body" /><circle cx="33" cy="-19" r="7.5" :fill="c.body" />
-        <ellipse rx="42" ry="33" :fill="c.body" />
-        <!-- silver-white cape from the forehead back (outline redrawn on top) -->
-        <path d="M-42-2C-42-21-24-33 0-33S42-21 42-2C30-11 16-16 0-16S-30-11-42-2Z" :fill="c.cape" stroke="none" />
-        <ellipse rx="42" ry="33" fill="none" />
-        <ellipse cy="12" rx="19" ry="13" :fill="c.muzzle" stroke="none" />
-        <ellipse cy="5" rx="7.5" ry="4.8" fill="#1E1A1A" stroke="none" /><ellipse cx="-2.5" cy="3.6" rx="2" ry="1.2" fill="#6F6866" stroke="none" />
-      </template>
-      <template v-else>
-        <!-- small ears tucked on top -->
-        <ellipse cx="-27" cy="-33" rx="6.5" ry="5" :fill="c.ear" /><ellipse cx="27" cy="-33" rx="6.5" ry="5" :fill="c.ear" />
-        <!-- boxy head with a long, blunt snout -->
-        <path d="M-40-6c0-20 12-30 40-30s40 10 40 30v8c0 20-16 30-40 30s-40-10-40-30Z" :fill="c.body" />
-        <path d="M-21 12c0-14 7-20 21-20s21 6 21 20-9 18-21 18-21-6-21-18Z" :fill="c.muzzle" stroke="none" />
-        <!-- big dark capybara nose with nostrils -->
-        <path d="M-13-1c0-5 6-7 13-7s13 2 13 7-6 9-13 9-13-4-13-9Z" fill="#5B3A27" stroke="none" />
-        <ellipse cx="-6" cy="-2" rx="2.4" ry="1.6" fill="#8C6046" stroke="none" /><ellipse cx="6" cy="-2" rx="2.4" ry="1.6" fill="#8C6046" stroke="none" />
-        <path d="M-12-31q3-4 7-4M2-36q2-3 5-3" :stroke="c.mark" stroke-width="2.2" fill="none" />
+
+      <template v-else-if="species === 'capybara'">
+        <ellipse cx="-24" cy="-33" rx="8" ry="6.5" :fill="s.shade" />
+        <path d="M-38-6c0-20 12-30 36-30h28c18 0 30 10 32 24l2 18c1 14-9 24-24 24h-46c-18 0-28-12-28-36Z" :fill="`url(#${id}-fur)`" />
+        <path d="M24 12c0-10 10-14 22-14 10 0 14 6 14 14s-6 18-18 18c-10 0-18-6-18-18Z" :fill="s.belly" stroke="none" />
+        <!-- big blunt capybara nose -->
+        <path d="M40-12c6-5 15-3 18 4 2 7-3 12-10 11-7-1-11-9-8-15Z" fill="#4E3020" stroke="none" />
+        <ellipse cx="51" cy="-8" rx="2.4" ry="1.6" fill="#8A5F44" stroke="none" />
+        <path d="M-14-32q4-4 9-4M2-36q3-3 6-3" :stroke="s.mark" stroke-width="2.4" fill="none" />
         <!-- the classic capybara mandarin -->
-        <circle cy="-45" r="10" fill="#F5A33B" /><path d="M0-55q8-9 15-4-6 9-15 4Z" fill="#7DB35A" stroke-width="2" />
-        <circle cx="-3" cy="-48" r="2" fill="#FFD27F" stroke="none" />
+        <circle cx="0" cy="-44" r="10" fill="#F5A33B" /><path d="M0-54q8-9 15-4-6 9-15 4Z" fill="#7DB35A" stroke-width="2.2" />
+        <circle cx="-3" cy="-47" r="2" fill="#FFD27F" stroke="none" />
       </template>
 
-      <!-- Cheeks -->
-      <ellipse :cx="species === 'cat' ? -25 : -29" :cy="species === 'cat' ? 10 : species === 'capybara' ? 4 : 9" rx="7" ry="4.5" fill="#F4A6A0" opacity=".75" stroke="none" />
-      <ellipse :cx="species === 'cat' ? 25 : 29" :cy="species === 'cat' ? 10 : species === 'capybara' ? 4 : 9" rx="7" ry="4.5" fill="#F4A6A0" opacity=".75" stroke="none" />
-      <path v-if="mood === 'shy'" d="M-31 9l4-5M-26 10l4-5M-21 11l4-5M19 11l4-5M24 10l4-5M29 9l4-5" stroke="#E46F6F" stroke-width="1.8" fill="none" />
-
-      <!-- Eyes -->
-      <g v-if="beady && (mood === 'neutral' || mood === 'shy')">
-        <template v-if="species === 'honey_badger'"><circle :cx="-eye.x" :cy="eye.y" r="6.6" :fill="eye.ink" stroke="none" /><circle :cx="eye.x" :cy="eye.y" r="6.6" :fill="eye.ink" stroke="none" /></template>
-        <ellipse :cx="-eye.x + (mood === 'shy' ? 2 : 0)" :cy="eye.y" rx="4" ry="4.8" :fill="OUTLINE" stroke="none" />
-        <ellipse :cx="eye.x + (mood === 'shy' ? 2 : 0)" :cy="eye.y" rx="4" ry="4.8" :fill="OUTLINE" stroke="none" />
-        <circle :cx="-eye.x + 1.4 + (mood === 'shy' ? 2 : 0)" :cy="eye.y - 2" r="1.5" fill="#fff" stroke="none" /><circle :cx="eye.x + 1.4 + (mood === 'shy' ? 2 : 0)" :cy="eye.y - 2" r="1.5" fill="#fff" stroke="none" />
-      </g>
-      <path v-else-if="beady && mood === 'happy'" :d="`M${-eye.x - 6} ${eye.y + 1}q6-8 12 0M${eye.x - 6} ${eye.y + 1}q6-8 12 0`" :stroke="eye.ink" stroke-width="3" fill="none" />
-      <path v-else-if="beady" :d="`M${-eye.x - 7} ${eye.y - 6}l11 6-11 6M${eye.x + 7} ${eye.y - 6}l-11 6 11 6`" :stroke="eye.ink" stroke-width="3" fill="none" />
-      <g v-else-if="mood === 'neutral' || mood === 'shy'">
-        <ellipse cx="-16" cy="-8" rx="8" ry="7" fill="#fff" stroke-width="2.5" /><ellipse cx="16" cy="-8" rx="8" ry="7" fill="#fff" stroke-width="2.5" />
-        <circle :cx="mood === 'shy' ? -12 : -15" cy="-5" r="3.2" :fill="OUTLINE" stroke="none" /><circle :cx="mood === 'shy' ? 20 : 17" cy="-5" r="3.2" :fill="OUTLINE" stroke="none" />
-        <path v-if="mood === 'neutral'" d="M-24-8a8 7 0 0 1 16 0ZM8-8a8 7 0 0 1 16 0Z" :fill="c.body" stroke-width="2.5" />
-      </g>
-      <path v-else-if="mood === 'happy'" d="M-23-6q7-9 14 0M9-6q7-9 14 0" stroke-width="3" fill="none" />
-      <path v-else d="M-24-14l12 6-12 6M24-14l-12 6 12 6" stroke-width="3" fill="none" />
-
-      <!-- Mouth -->
-      <template v-if="openMouth">
-        <path :d="species === 'cat' ? 'M-8 10q8 13 16 0Z' : species === 'hamster' ? 'M-6 9q6 10 12 0Z' : 'M-7 14q7 11 14 0Z'" fill="#8A3B33" stroke-width="2.5" />
-        <path v-if="species === 'hamster'" d="M-3 9.5h6v3.5h-6Z" fill="#fff" stroke-width="1.5" />
-        <ellipse v-else :cy="species === 'cat' ? 16.5 : 19.5" rx="4" ry="2.8" fill="#F28B8B" stroke="none" />
+      <template v-else-if="species === 'honey_badger'">
+        <ellipse cx="-24" cy="-24" rx="8" ry="7" :fill="s.fur" />
+        <path d="M-38 2c0-24 18-34 42-32 22 2 38 14 50 28 4 6 2 12-6 14-12 4-22 12-42 14-26 2-44-6-44-24Z" :fill="`url(#${id}-fur)`" />
+        <!-- silver-white cape from the forehead back, outline redrawn on top -->
+        <path d="M-38 2c0-24 18-34 42-32 18 2 32 10 42 20-14-4-28-4-42 0-16 4-30 8-42 12Z" :fill="s.mark" stroke="none" />
+        <path d="M-38 2c0-24 18-34 42-32 22 2 38 14 50 28 4 6 2 12-6 14-12 4-22 12-42 14-26 2-44-6-44-24Z" fill="none" />
+        <ellipse cx="53" cy="0" rx="6.5" ry="5" fill="#141010" stroke="none" />
       </template>
-      <path v-else-if="species === 'cat'" :d="mood === 'shy' ? 'M-5 13q2.5-2 5 0t5 0' : 'M-8 11q4 4 8 0 4 4 8 0'" stroke-width="2.5" fill="none" />
-      <path v-else-if="species === 'hamster'" :d="mood === 'shy' ? 'M-4 10q2-2 4 0t4 0' : 'M0 5v3M-6 8q3 4 6 0 3 4 6 0'" stroke-width="2.3" fill="none" />
-      <path v-else :d="mood === 'shy' ? 'M-4 16q2-2 4 0t4 0' : 'M0 8v5M-7 13q3.5 4 7 0 3.5 4 7 0'" stroke-width="2.5" fill="none" />
+
+      <template v-else>
+        <circle cx="-22" cy="-27" r="10" :fill="s.fur" /><circle cx="-22" cy="-27" r="5" :fill="s.paw" stroke="none" />
+        <circle cx="8" cy="-31" r="10" :fill="s.fur" /><circle cx="8" cy="-31" r="5" :fill="s.paw" stroke="none" />
+        <ellipse rx="40" ry="33" :fill="`url(#${id}-fur)`" />
+        <!-- cream face with a puffy cheek pouch -->
+        <path d="M2 2c8-10 30-10 38 2 6 10 2 24-12 28-18 4-32-4-32-14 0-6 2-12 6-16Z" :fill="s.belly" stroke="none" />
+        <path d="M-6-32q2 6 0 11M2-33q2 6 0 11" :stroke="s.mark" stroke-width="2.4" fill="none" />
+        <ellipse cx="38" cy="2" rx="4.5" ry="3.4" fill="#EF8A8A" stroke-width="2" />
+      </template>
+
+      <!-- Blush (the dog's peach cheeks; diagonal strokes when shy) -->
+      <ellipse :cx="s.blush.x" :cy="s.blush.y" rx="8" ry="5" fill="#F4A08C" opacity=".7" stroke="none" />
+      <path v-if="mood === 'shy'" :transform="`translate(${s.blush.x} ${s.blush.y})`" d="M-8 3l4-6M-3 4l4-6M2 4l4-6" stroke="#E3685E" stroke-width="1.8" fill="none" />
+
+      <!-- Eyes: two big whites close together, heavy sleepy lids -->
+      <g v-if="sleepy">
+        <ellipse :cx="s.eyes.bx" :cy="s.eyes.y" :rx="RX" :ry="RY" fill="#fff" stroke-width="3" />
+        <ellipse :cx="s.eyes.fx" :cy="s.eyes.y" :rx="RX" :ry="RY" fill="#fff" stroke-width="3" />
+        <circle :cx="s.eyes.bx + (mood === 'shy' ? 3.5 : 1.5)" :cy="s.eyes.y + 3" r="3.6" :fill="INK" stroke="none" />
+        <circle :cx="s.eyes.fx + (mood === 'shy' ? 3.5 : 1.5)" :cy="s.eyes.y + 3" r="3.6" :fill="INK" stroke="none" />
+        <path :d="lid(s.eyes.bx)" :fill="s.fur" stroke-width="3.4" /><path :d="lid(s.eyes.fx)" :fill="s.fur" stroke-width="3.4" />
+      </g>
+      <path v-else-if="mood === 'happy'" :d="`M${s.eyes.bx - 8} ${s.eyes.y + 2}q8-10 16 0M${s.eyes.fx - 8} ${s.eyes.y + 2}q8-10 16 0`"
+            :stroke="species === 'honey_badger' ? '#F4EFE6' : INK" stroke-width="3.4" fill="none" />
+      <path v-else :d="`M${s.eyes.bx - 7} ${s.eyes.y - 6}l11 6-11 6M${s.eyes.fx + 7} ${s.eyes.y - 6}l-11 6 11 6`"
+            :stroke="species === 'honey_badger' ? '#F4EFE6' : INK" stroke-width="3.4" fill="none" />
+
+      <!-- Mouth: the dog's smirk, tongue out when happy -->
+      <g :transform="`translate(${s.mouth.x} ${s.mouth.y})`">
+        <template v-if="openMouth">
+          <path d="M-10-2q10 10 20-2Z" fill="#7E2F2A" stroke-width="2.8" />
+          <path d="M-3 3c-1 9 2 14 7 14s7-6 5-15" fill="#F2899A" stroke-width="2.6" /><path d="M2 6v7" stroke="#D96478" stroke-width="1.8" />
+        </template>
+        <path v-else-if="mood === 'shy'" d="M-6 0q3-3 6 0t6 0" stroke-width="2.6" fill="none" />
+        <path v-else d="M-10-1q9 7 18-3" stroke-width="2.8" fill="none" />
+      </g>
     </g>
   </svg>
 </template>

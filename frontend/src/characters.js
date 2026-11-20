@@ -1,6 +1,7 @@
-// Character art cropped from task/ui-source (Dog-Growth.png, Design system.png).
-const files = import.meta.glob('/src/assets/characters/*.webp', { eager: true, import: 'default' })
-export const art = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop().replace('.webp', ''), url]))
+// Character art cropped from task/ui-source (Dog-Growth.png, Design system.png). Pet art for other
+// species is picked up the same way when its files are added (see PetArt.vue for the names).
+const files = import.meta.glob('/src/assets/characters/*.{webp,png}', { eager: true, import: 'default' })
+export const art = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop().replace(/\.(webp|png)$/, ''), url]))
 
 /** 'female' (Cún Nón Lá) or 'male' (Cún Mũ Xanh) for a user, from their gender. */
 export function characterOf(user) {

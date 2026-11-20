@@ -3,10 +3,10 @@ import { ref } from 'vue'
 // Season themes: autumn is the original look; the rest only swap CSS colour tokens
 // (see style.css, :root[data-theme=…]). The choice is a per-device preference.
 export const THEMES = [
-  { key: 'spring', label: 'Xuân', icon: '🌸', color: '#F6B6C8', bg: '#FCEAF0' },
-  { key: 'summer', label: 'Hạ', icon: '☀️', color: '#8DD5DF', bg: '#E2F3F3' },
+  { key: 'spring', label: 'Xuân', icon: '🌸', color: '#F2B3BE', bg: '#F8E7E3' },
+  { key: 'summer', label: 'Hạ', icon: '🌻', color: '#A9D18E', bg: '#F7EFD6' },
   { key: 'autumn', label: 'Thu', icon: '🍁', color: '#E8A07A', bg: '#F6E8DD' },
-  { key: 'winter', label: 'Đông', icon: '❄️', color: '#B9CDEB', bg: '#E7EEF8' },
+  { key: 'winter', label: 'Đông', icon: '❄️', color: '#D7A3B4', bg: '#F2ECE8' },
 ]
 const KEY = 'theme'
 const DEFAULT = 'autumn'
