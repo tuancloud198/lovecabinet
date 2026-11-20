@@ -1,7 +1,6 @@
-// Character art cropped from task/ui-source (Dog-Growth.png, Design system.png). Pet art for other
-// species is picked up the same way when its files are added (see PetArt.vue for the names).
-const files = import.meta.glob('/src/assets/characters/*.{webp,png}', { eager: true, import: 'default' })
-export const art = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop().replace(/\.(webp|png)$/, ''), url]))
+// Character art cropped from task/ui-source (Dog-Growth.png, Design system.png).
+const files = import.meta.glob('/src/assets/characters/*.webp', { eager: true, import: 'default' })
+export const art = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop().replace('.webp', ''), url]))
 
 /** 'female' (Cún Nón Lá) or 'male' (Cún Mũ Xanh) for a user, from their gender. */
 export function characterOf(user) {
@@ -40,15 +39,7 @@ export function petStatus(memories) {
   }
 }
 
-export const PET_SPECIES = [
-  { key: 'dog', label: 'Cún', baby: 'Cún con' },
-  { key: 'cat', label: 'Mèo', baby: 'Mèo con' },
-  { key: 'capybara', label: 'Capybara', baby: 'Capy con' },
-  { key: 'honey_badger', label: 'Lửng mật', baby: 'Lửng con' },
-  { key: 'hamster', label: 'Hamster', baby: 'Hamster con' },
-]
-
-/** Stage name for a species: the first stage is 'Cún con' / 'Mèo con' / 'Capy con'. */
-export function stageLabel(species, index) {
-  return index === 0 ? (PET_SPECIES.find(s => s.key === species)?.baby ?? STAGES[0].label) : STAGES[index].label
+/** Stage name: the first stage is 'Cún con'. */
+export function stageLabel(index) {
+  return index === 0 ? 'Cún con' : STAGES[index].label
 }

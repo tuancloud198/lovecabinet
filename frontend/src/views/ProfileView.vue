@@ -8,7 +8,6 @@ import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import UserTag from '@/components/UserTag.vue'
-import { THEMES, theme, applyTheme } from '@/theme.js'
 
 // Release check: both versions are the image tags, so after a deploy you can see it went live.
 const frontendVersion = import.meta.env.VITE_APP_VERSION || 'dev'
@@ -59,14 +58,6 @@ function save() {
         <div><strong>{{ state.memories.length }}</strong><small>kỷ niệm</small></div>
         <div><strong>{{ state.jars.length }}</strong><small>hũ</small></div>
         <div><strong>{{ state.events.length }}</strong><small>sự kiện</small></div>
-      </div>
-    </section>
-    <section class="card theme-card">
-      <h3>Giao diện theo mùa</h3>
-      <div class="theme-grid" role="radiogroup" aria-label="Giao diện">
-        <button v-for="t in THEMES" :key="t.key" type="button" role="radio" :aria-checked="theme === t.key" :class="{ chosen: theme === t.key }" @click="applyTheme(t.key)">
-          <span class="theme-dot" :style="{ background: t.color }">{{ t.icon }}</span>{{ t.label }}
-        </button>
       </div>
     </section>
     <button class="btn outline block" :disabled="state.busy" @click="signOut"><LogOut :size="18" /> Đăng xuất</button>

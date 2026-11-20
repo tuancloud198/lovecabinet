@@ -344,11 +344,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .stats div { display: flex; flex-direction: column; }
 .stats strong { font-size: 20px; color: var(--primary); }
 .stats small { color: var(--muted); }
-.species-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.species-grid button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: var(--r-l); border: 2px solid var(--border-soft); background: var(--surface); font-weight: 600; }
-.species-grid button.chosen { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
-.species-grid .pet-art { height: 72px; width: 100%; object-fit: contain; }
-.species-note { font-size: 12px; font-weight: 400; }
 
 /* Full-screen photo viewer */
 .viewer { position: fixed; inset: 0; z-index: 100; background: rgba(20, 14, 11, .94); display: flex; align-items: center; justify-content: center; padding: 56px 8px; touch-action: pan-y; }
@@ -373,39 +368,3 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .upload-progress-track { height: 8px; border-radius: 999px; background: var(--primary-light); overflow: hidden; }
 .upload-progress-bar { height: 100%; border-radius: inherit; background: var(--primary); transition: width .2s ease; }
 .app-version { text-align: center; font-size: 11px; color: var(--muted); margin-top: 12px; }
-
-/* Season themes. Autumn is the default (:root above). Every season keeps the same warm cream
-   paper, warm-brown text and wooden cabinet so it suits the hand-drawn characters; only the
-   accent colour and a light seasonal tint change. Chosen on Profile, remembered per device. */
-:root[data-theme="spring"] {
-  --primary: #C4566E; --primary-strong: #A9465C; --primary-light: #FBE6E8; --accent: #F2C46A;
-  --secondary: #5E8A4C; --secondary-light: #EAF1DF; --bg: #FFF8F2;
-  --border: #E5CEC4; --border-soft: #F1E2DA;
-  --page-bg: #F8E7E3; --heading: #8F3348; --primary-top: #D26A81; --primary-border: #EAB0B9;
-  --primary-glow: rgba(196, 86, 110, .26); --primary-glow-strong: rgba(196, 86, 110, .33);
-  --chip-soft: #F8ECE8; --track: #F2E1DC; --fill-start: #E58C9D; --hover: #FBF0EC; --stage-ground: #E1EBC4;
-}
-:root[data-theme="summer"] {
-  --primary: #4A8238; --primary-strong: #3C6D2D; --primary-light: #E6F1DA; --accent: #F2B43C;
-  --secondary: #4A8238; --secondary-light: #EEF3DD; --bg: #FFFAF0;
-  --border: #DCD3B8; --border-soft: #EEE6D2;
-  --page-bg: #F7EFD6; --heading: #3A6A2B; --primary-top: #5C9747; --primary-border: #AFCF9C;
-  --primary-glow: rgba(74, 130, 56, .25); --primary-glow-strong: rgba(74, 130, 56, .32);
-  --chip-soft: #F3EEDC; --track: #ECE5CF; --fill-start: #8DC06F; --hover: #FAF5E6; --stage-ground: #F1DFA6;
-}
-:root[data-theme="winter"] {
-  --primary: #9C3E5A; --primary-strong: #84324B; --primary-light: #F6E4EA; --accent: #E6C27A;
-  --secondary: #4E7466; --secondary-light: #E6EEEA; --bg: #FFFCF9;
-  --border: #DCD0CB; --border-soft: #EEE6E2;
-  --page-bg: #F2ECE8; --heading: #7A2E45; --primary-top: #AE5170; --primary-border: #D9A9B8;
-  --primary-glow: rgba(156, 62, 90, .24); --primary-glow-strong: rgba(156, 62, 90, .31);
-  --chip-soft: #F5EEEB; --track: #ECE3DF; --fill-start: #C9748F; --hover: #FAF5F3; --stage-ground: #FFFFFF;
-}
-
-/* Theme picker (Profile) */
-.theme-card { margin: 0 0 16px; padding: 16px; }
-.theme-card h3 { font-size: 15px; margin-bottom: 12px; }
-.theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.theme-grid button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: var(--r-l); border: 2px solid var(--border-soft); background: var(--surface); font-size: 13px; font-weight: 600; }
-.theme-grid button.chosen { border-color: var(--primary); background: var(--primary-light); color: var(--primary-strong); }
-.theme-dot { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .6); }
