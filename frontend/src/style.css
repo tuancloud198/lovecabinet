@@ -216,9 +216,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 /* ---------- Cabinet (Tủ) ---------- */
 .couple-head { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 4px 0 12px; }
 .couple-head .heart { font-size: 22px; }
-.year-chip { display: flex; align-items: center; gap: 4px; width: fit-content; margin: 0 auto 12px; padding: 6px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-weight: 700; position: relative; }
-.year-chip select { appearance: none; border: 0; background: none; font-weight: 700; padding-right: 2px; cursor: pointer; }
-.year-chip select:focus { outline: none; }
 .cabinet { padding: 14px 12px 0; border-radius: 22px 22px 12px 12px; border: 6px solid var(--wood-dark);
   background: repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 2px, transparent 2px 22px), linear-gradient(180deg, var(--wood-light), var(--wood)); box-shadow: inset 0 8px 18px rgba(98,66,35,.18), var(--shadow); }
 .shelf-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }

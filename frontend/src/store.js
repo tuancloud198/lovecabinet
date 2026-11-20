@@ -22,8 +22,6 @@ export const state = reactive({
   justPaired: false,
   /** Main app screen: { name, params }. */
   view: { name: 'cabinet', params: {} },
-  /** Cabinet filter: which year. */
-  year: new Date().getFullYear(),
 })
 
 export const partner = computed(() => state.couple?.members.find(m => m.id !== state.me?.id) || null)

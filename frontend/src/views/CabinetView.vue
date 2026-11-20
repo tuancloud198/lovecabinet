@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Bell, ChevronDown, Heart, MessageCircle, Plus } from 'lucide-vue-next'
+import { Bell, Heart, MessageCircle, Plus } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { timeAgo } from '@/format.js'
 import { state, partner, navigate, run, cabinetForYear, toast } from '@/store.js'
@@ -12,11 +12,8 @@ import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
 
 const JAR_COLORS = ['#F6C9C4', '#BFD7EA', '#F3D9A4', '#CFE3CF', '#E3D3EE']
-const years = computed(() => [...new Set([new Date().getFullYear(), ...state.cabinets.map(c => c.year)])].sort((a, b) => b - a))
-const jars = computed(() => {
-  const cabinetIds = state.cabinets.filter(c => c.year === Number(state.year)).map(c => c.id)
-  return state.jars.filter(j => cabinetIds.includes(j.cabinet))
-})
+// A couple has one cabinet (Tủ): show every jar in it.
+const jars = computed(() => state.jars)
 const memoriesIn = jar => state.memories.filter(m => m.jar === jar.id)
 const emojisIn = jar => {
   const emojis = memoriesIn(jar).map(m => m.emoji)
@@ -53,7 +50,7 @@ function startJar() {
 }
 function saveJar() {
   run(async () => {
-    const cabinet = await cabinetForYear(Number(state.year))
+    const cabinet = state.cabinets[0] ?? (await cabinetForYear(new Date().getFullYear()))
     state.jars.push(await api('jars/', { method: 'POST', body: { ...form.value, cabinet: cabinet.id } }))
     addingJar.value = false
     toast('Đã tạo hũ mới!')
@@ -73,9 +70,6 @@ function saveJar() {
       <CharacterAvatar :user="partner" :size="56" />
       <span class="visually-hidden">Tủ chung của {{ state.me.display_name }} và {{ partner?.display_name }}</span>
     </div>
-    <label class="year-chip"><span class="visually-hidden">Năm</span>
-      <select v-model.number="state.year"><option v-for="y in years" :key="y" :value="y">{{ y }}</option></select><ChevronDown :size="16" />
-    </label>
 
     <div class="cabinet">
       <div v-if="!jars.length" class="cabinet-empty">
