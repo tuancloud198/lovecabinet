@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { LogOut, Pencil } from 'lucide-vue-next'
+import { Camera, LogOut, Pencil } from 'lucide-vue-next'
 import { daysTogether } from '@/anniversaries.js'
-import { api } from '@/api.js'
+import { api, upload } from '@/api.js'
+import { uploadablePhoto } from '@/photos.js'
 import { displayDate } from '@/format.js'
 import { state, partner, run, signOut, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
@@ -16,6 +17,31 @@ const frontendVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 const backendVersion = ref('…')
 onMounted(() => api('auth/config/').then(data => { backendVersion.value = data.version || 'dev' }).catch(() => { backendVersion.value = '?' }))
 const editing = ref(false)
+
+// Own profile picture instead of the dog character (cropped to a square by the server).
+function applyMe(user) {
+  state.me = user
+  const member = state.couple?.members.find(m => m.id === user.id)
+  if (member) Object.assign(member, user)
+}
+function changeAvatar(event) {
+  const file = event.target.files[0]
+  event.target.value = ''
+  if (!file) return
+  run(async () => {
+    const body = new FormData()
+    body.append('file', await uploadablePhoto(file))
+    applyMe(await upload('users/me/avatar/', body))
+    toast('Đã đổi ảnh đại diện!')
+  })
+}
+function resetAvatar() {
+  if (!window.confirm('Dùng lại hình chú cún làm ảnh đại diện?')) return
+  run(async () => {
+    applyMe(await api('users/me/avatar/', { method: 'DELETE' }))
+    toast('Đã dùng lại hình chú cún.')
+  })
+}
 const editingDates = ref(false)
 const form = ref({})
 function startEdit() {
@@ -41,7 +67,13 @@ function save() {
       <button class="icon-button" aria-label="Chỉnh sửa hồ sơ" @click="startEdit"><Pencil :size="20" /></button>
     </AppHeader>
     <section class="profile-card card">
-      <CharacterAvatar :user="state.me" mood="happy" :size="112" />
+      <label class="avatar-edit" :class="{ busy: state.busy }">
+        <CharacterAvatar :user="state.me" mood="happy" :size="112" />
+        <span class="avatar-edit-badge" aria-hidden="true"><Camera :size="16" /></span>
+        <span class="visually-hidden">Đổi ảnh đại diện</span>
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" :disabled="state.busy" @change="changeAvatar" />
+      </label>
+      <button v-if="state.me.avatar_url" class="link-button avatar-reset" :disabled="state.busy" @click="resetAvatar">Dùng lại hình chú cún</button>
       <h2>{{ state.me.display_name }}</h2>
       <p class="muted">@{{ state.me.username }}</p>
       <UserTag :tag="state.me.tag" class="big-tag" />

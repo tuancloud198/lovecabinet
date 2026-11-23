@@ -29,6 +29,8 @@ class User(AbstractUser):
     gender = models.CharField(max_length=30, blank=True)
     # Google account id ("sub" claim) for users who sign in with Google.
     google_sub = models.CharField(max_length=255, unique=True, null=True, blank=True, editable=False)
+    # Own profile picture in S3 (users/avatars.py); empty = the default character art.
+    avatar_key = models.CharField(max_length=200, blank=True, editable=False)
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

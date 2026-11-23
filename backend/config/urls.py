@@ -18,7 +18,7 @@ urlpatterns = [path('api/photos/<int:pk>/stream/', photo_stream), path('api/heal
                 path('api/auth/logout/', users.logout), 
                 path('api/auth/google/', users.google), 
                 path('api/auth/config/', users.auth_config), 
-                path('api/users/me/', users.me), 
+                path('api/users/me/', users.me), path('api/users/me/avatar/', users.my_avatar), path('api/users/<int:pk>/avatar/', users.avatar), 
                 path('api/couple-invitations/', 
                 invitations.invitations), 
                 path('api/couple-invitations/<int:pk>/accept/', invitations.accept), 

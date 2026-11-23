@@ -10,6 +10,7 @@ import { QUESTION_BANK } from '@/quizBank.js'
 import { state, partner, run, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import QuizBattle from '@/components/QuizBattle.vue'
 
 const LETTERS = ['A', 'B', 'C', 'D']
 const me = computed(() => state.me.id)
@@ -19,9 +20,6 @@ const byOldest = (a, b) => a.id - b.id
 const waiting = computed(() => state.quiz.filter(q => q.author !== me.value && !q.answer).sort(byOldest))
 const asked = computed(() => state.quiz.filter(q => q.author === me.value).sort((a, b) => b.id - a.id))
 const answered = computed(() => state.quiz.filter(q => q.author !== me.value && q.answer).sort((a, b) => b.answer.created_at.localeCompare(a.answer.created_at)))
-const percent = list => (list.length ? Math.round((list.filter(q => q.answer.correct).length / list.length) * 100) : null)
-const myScore = computed(() => percent(answered.value))
-const partnerScore = computed(() => percent(asked.value.filter(q => q.answer)))
 const answeredToday = computed(() => state.quiz.some(q => q.answer?.answered_on === isoDate()))
 const tab = ref('waiting') // waiting | asked | answered
 
@@ -92,6 +90,7 @@ function removeQuestion(question) {
   <div class="page quiz-page">
     <AppHeader title="Đố vui"><template #title-suffix><span class="heart">♡</span></template></AppHeader>
 
+    <QuizBattle />
     <section class="quiz-stats">
       <div class="quiz-stat streak" :class="{ lit: answeredToday }">
         <Flame :size="22" /><strong>{{ state.couple.quiz_streak || 0 }}</strong><small>ngày liên tiếp</small>
@@ -99,14 +98,7 @@ function removeQuestion(question) {
       <div class="quiz-stat"><Trophy :size="22" /><strong>{{ state.couple.quiz_max_streak || 0 }}</strong><small>kỷ lục</small></div>
       <div class="quiz-stat"><Star :size="22" /><strong>{{ state.couple.pet_points || 0 }}</strong><small>điểm cho {{ petName }}</small></div>
     </section>
-    <p class="muted center quiz-hint">
-      {{ answeredToday ? 'Hôm nay đã giữ chuỗi rồi 🔥' : 'Trả lời một câu hôm nay để giữ chuỗi nhé!' }}
-      <template v-if="myScore != null || partnerScore != null"><br />
-        <span v-if="myScore != null">Bạn hiểu {{ partnerName }} {{ myScore }}%</span>
-        <span v-if="myScore != null && partnerScore != null"> · </span>
-        <span v-if="partnerScore != null">{{ partnerName }} hiểu bạn {{ partnerScore }}%</span>
-      </template>
-    </p>
+    <p class="muted center quiz-hint">{{ answeredToday ? 'Hôm nay đã giữ chuỗi rồi 🔥' : 'Trả lời một câu hôm nay để giữ chuỗi nhé!' }}</p>
 
     <div class="segmented quiz-tabs" role="tablist">
       <button role="tab" :aria-selected="tab === 'waiting'" :class="{ active: tab === 'waiting' }" @click="tab = 'waiting'">Cho bạn<span v-if="waiting.length" class="quiz-count">{{ waiting.length }}</span></button>

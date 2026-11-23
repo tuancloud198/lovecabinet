@@ -388,6 +388,31 @@ class WorkflowTests(APITestCase):
         self.auth(self.other)  # not in this couple: can't see or answer it
         self.assertIn(self.client.get(url).status_code, (400, 404))
         self.assertIn(self.client.post(url + 'answer/', {'choice': 0}, format='json').status_code, (400, 404))
+    @patch('photos.services.storage')
+    def test_avatar_upload_square_private_and_remove(self, storage):
+        self.pair()
+        self.auth(self.alice)
+        data = BytesIO()
+        Image.new('RGB', (1200, 800), 'blue').save(data, format='HEIF')  # any supported photo, here HEIC
+        response = self.client.post('/api/users/me/avatar/', {'file': SimpleUploadedFile('me.heic', data.getvalue())}, format='multipart')
+        self.assertEqual(response.status_code, 200)
+        url = response.data['avatar_url']
+        self.assertRegex(url, rf'^/api/users/{self.alice.id}/avatar/\?v=[0-9a-f]{{32}}$')
+        fileobj, _, key = storage.return_value.upload_fileobj.call_args.args
+        self.assertEqual(Image.open(fileobj).size, (512, 512))  # center-cropped square JPEG
+        self.assertTrue(key.startswith(f'avatars/{self.alice.id}/'))
+        bad = self.client.post('/api/users/me/avatar/', {'file': SimpleUploadedFile('x.png', b'not an image')}, format='multipart')
+        self.assertEqual(bad.status_code, 400)
+        storage.return_value.get_object.return_value = {'Body': BytesIO(b'jpeg-bytes')}
+        self.auth(self.bob)  # the partner sees it (in the couple's member list too)
+        self.assertEqual(self.client.get('/api/couples/').data[0]['members'][0]['avatar_url'] or self.client.get('/api/couples/').data[0]['members'][1]['avatar_url'], url)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.auth(self.other)  # nobody else does
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.auth(self.alice)  # back to the character art; the old file is deleted
+        response = self.client.delete('/api/users/me/avatar/')
+        self.assertIsNone(response.data['avatar_url'])
+        storage.return_value.delete_object.assert_called_once_with(Bucket=ANY, Key=key)
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

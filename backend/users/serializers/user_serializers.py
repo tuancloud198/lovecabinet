@@ -3,9 +3,13 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from users.models import User
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+    def get_avatar_url(self, obj):
+        from users.avatars import avatar_url
+        return avatar_url(obj)
     class Meta:
         model = User
-        fields = ['id', 'username', 'tag', 'display_name', 'birth_date', 'bio', 'gender']
+        fields = ['id', 'username', 'tag', 'display_name', 'birth_date', 'bio', 'gender', 'avatar_url']
         read_only_fields = ['id', 'username', 'tag']
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
