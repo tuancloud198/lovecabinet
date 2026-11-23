@@ -109,7 +109,7 @@ jobs:
           echo "Deploying $PREFIX:$TAG (was ${prev_prefix:-docker.io/tuanlg198}: backend $prev_backend, frontend $prev_frontend)"
           set_tags "$TAG" "$TAG" "$PREFIX"
           if docker compose pull -q backend frontend && docker compose up -d && healthy; then
-            docker image prune -f >/dev/null
+            docker image prune -af >/dev/null
             docker compose ps --format '{{.Service}}: {{.Image}} {{.Status}}'
             echo "Deployed $TAG"
             exit 0
