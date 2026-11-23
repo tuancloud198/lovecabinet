@@ -29,7 +29,8 @@ const cells = computed(() => {
 })
 const upcoming = computed(() => [
   ...state.events.filter(e => e.date >= today),
-  ...upcomingAnniversaries(state.couple).slice(0, 3).map(a => ({ ...a, anniversary: true })),
+  // Our anniversaries and birthdays in the next 12 months.
+  ...upcomingAnniversaries(state.couple).filter(a => daysUntil(a.date) < 366).map(a => ({ ...a, anniversary: true })),
 ].sort((a, b) => a.date.localeCompare(b.date)))
 const shift = n => { month.value = new Date(month.value.getFullYear(), month.value.getMonth() + n, 1) }
 

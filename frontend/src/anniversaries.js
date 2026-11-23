@@ -2,6 +2,7 @@
 //   dating_since: the day we started loving each other = day 1 of the count
 //   met_on:       the day we first met
 // Milestones: every 100 days up to 1000, then every 500; yearly anniversaries of both dates.
+// Also both partners' birthdays (members' birth_date from their profiles).
 import { isoDate } from '@/format.js'
 
 const parse = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d) }
@@ -39,8 +40,14 @@ export function anniversaries(couple, from, to) {
     add(met, 'Ngày gặp nhau lần đầu', '👋')
     for (let k = 1; addYears(met, k) <= to; k++) add(addYears(met, k), `${k} năm ngày gặp nhau`, '🌷')
   }
+  for (const member of couple?.members ?? []) {
+    const born = member.birth_date
+    if (!born) continue
+    const first = Math.max(1, Number(from.slice(0, 4)) - Number(born.slice(0, 4))) // skip years before the range
+    for (let k = first; addYears(born, k) <= to; k++) add(addYears(born, k), `Sinh nhật ${member.display_name} (${k} tuổi)`, '🎂')
+  }
   return items.sort((a, b) => a.date.localeCompare(b.date))
 }
 
-/** Anniversaries from today on (the next two years). */
+/** Anniversaries and birthdays from today on (the next two years). */
 export const upcomingAnniversaries = (couple, today = isoDate()) => anniversaries(couple, today, addYears(today, 2))
