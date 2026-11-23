@@ -75,3 +75,32 @@ export async function searchPlaces(text) {
   const results = await nominatim('search', { q: text, limit: 5, addressdetails: 1 })
   return results.map(r => ({ place: shortName(r), detail: r.display_name, latitude: round(Number(r.lat)), longitude: round(Number(r.lon)) }))
 }
+
+// ---- "Same place": memories within NEAR_KM of each other (GPS from photos of one place varies) ----
+export const NEAR_KM = 1
+/** Distance between two { latitude, longitude } in km (haversine). */
+export function distanceKm(a, b) {
+  const rad = d => (d * Math.PI) / 180
+  const dLat = rad(b.latitude - a.latitude)
+  const dLng = rad(b.longitude - a.longitude)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}
+/** The most used place name among memories; a tie goes to the oldest memory's ('' if none has one). */
+export function placeLabel(memories) {
+  const counts = new Map() // insertion order = oldest first, and sort() is stable
+  for (const m of [...memories].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) if (m.place) counts.set(m.place, (counts.get(m.place) || 0) + 1)
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+}
+/** Pinned memories grouped by place (each within NEAR_KM of the group's first memory), biggest first:
+ * [{ key, label, latitude, longitude, memories }]. */
+export function placeGroups(memories) {
+  const groups = []
+  for (const m of memories.filter(hasLocation).sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
+    const group = groups.find(g => distanceKm(g, m) <= NEAR_KM)
+    if (group) group.memories.push(m)
+    else groups.push({ key: `${m.latitude},${m.longitude}`, latitude: m.latitude, longitude: m.longitude, memories: [m] })
+  }
+  for (const g of groups) g.label = placeLabel(g.memories) || 'Địa điểm chưa đặt tên'
+  return groups.sort((a, b) => b.memories.length - a.memories.length || a.label.localeCompare(b.label))
+}

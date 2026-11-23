@@ -546,3 +546,4 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .partner-info dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .partner-info dd.muted { font-weight: 400; }
 .stats { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); }
+.map-sheet-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }

@@ -80,7 +80,7 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
 
 <template>
   <div class="page">
-    <AppHeader title="Lịch của chúng ta"><template #title-suffix><span class="heart">♡</span></template></AppHeader>
+    <AppHeader title="Lịch của chúng ta" />
     <section class="calendar card">
       <div class="month-nav">
         <button class="icon-button" aria-label="Tháng trước" @click="shift(-1)"><ChevronLeft :size="20" /></button>

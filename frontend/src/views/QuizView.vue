@@ -88,7 +88,7 @@ function removeQuestion(question) {
 
 <template>
   <div class="page quiz-page">
-    <AppHeader title="Đố vui"><template #title-suffix><span class="heart">♡</span></template></AppHeader>
+    <AppHeader title="Đố vui" />
 
     <QuizBattle />
     <section class="quiz-stats">

@@ -1,9 +1,10 @@
 <script setup>
-// Pick a date range to replay: quick presets or custom from/to dates. Emits `start` with the
-// memories in the range (inclusive).
+// Pick what to replay: a date range (quick presets or custom from/to dates) and optionally one place
+// (memories pinned within NEAR_KM of each other). Emits `start` with the matching memories.
 import { ref, computed } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { isoDate } from '@/format.js'
+import { placeGroups } from '@/location.js'
 import { state } from '@/store.js'
 import BottomSheet from '@/components/BottomSheet.vue'
 
@@ -24,7 +25,13 @@ const presets = computed(() => [
 ])
 const range = ref({ from: props.from || first.value, to: props.to || last.value })
 const valid = computed(() => range.value.from && range.value.to && range.value.from <= range.value.to)
-const selected = computed(() => (valid.value ? state.memories.filter(m => m.date >= range.value.from && m.date <= range.value.to) : []))
+const places = computed(() => placeGroups(state.memories))
+const place = ref('') // a place group's key; '' = everywhere
+const inPlace = computed(() => {
+  const group = places.value.find(g => g.key === place.value)
+  return group ? new Set(group.memories.map(m => m.id)) : null
+})
+const selected = computed(() => (valid.value ? state.memories.filter(m => m.date >= range.value.from && m.date <= range.value.to && (!inPlace.value || inPlace.value.has(m.id))) : []))
 const isPreset = p => p.from === range.value.from && p.to === range.value.to
 </script>
 
@@ -38,8 +45,14 @@ const isPreset = p => p.from === range.value.from && p.to === range.value.to
         <label class="field">Từ ngày<input v-model="range.from" type="date" required :max="range.to" /></label>
         <label class="field">Đến ngày<input v-model="range.to" type="date" required :min="range.from" /></label>
       </div>
+      <label v-if="places.length" class="field">Địa điểm
+        <select v-model="place">
+          <option value="">Mọi nơi</option>
+          <option v-for="g in places" :key="g.key" :value="g.key">📍 {{ g.label }} ({{ g.memories.length }})</option>
+        </select>
+      </label>
       <p class="muted range-count" role="status">
-        {{ !valid ? 'Ngày bắt đầu phải trước ngày kết thúc.' : selected.length ? `${selected.length} kỷ niệm trong khoảng này` : 'Chưa có kỷ niệm nào trong khoảng này.' }}
+        {{ !valid ? 'Ngày bắt đầu phải trước ngày kết thúc.' : selected.length ? `${selected.length} kỷ niệm${place ? ' ở địa điểm này' : ''} trong khoảng này` : `Chưa có kỷ niệm nào${place ? ' ở địa điểm này' : ''} trong khoảng này.` }}
       </p>
       <button class="btn primary block" :disabled="!selected.length"><Play :size="18" fill="currentColor" /> Bắt đầu xem lại</button>
     </form>
