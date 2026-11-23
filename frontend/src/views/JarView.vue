@@ -9,6 +9,7 @@ import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
+import { coverPhoto } from '@/photos.js'
 
 const props = defineProps({ id: Number })
 const jar = computed(() => state.jars.find(j => j.id === props.id))
@@ -40,7 +41,7 @@ function removeJar() {
         <button class="btn primary" @click="navigate('capture', { jarId: jar.id })"><Camera :size="18" /> Chụp ngay</button>
       </EmptyState>
       <button v-for="m in memories" :key="m.id" class="memory-row card" @click="navigate('memory', { id: m.id })">
-        <span class="thumb"><PrivatePhoto v-if="m.photos[0]" :url="m.photos[0].url" /><span v-else>{{ m.emoji }}</span></span>
+        <span class="thumb"><PrivatePhoto v-if="coverPhoto(m)" :url="coverPhoto(m).url" /><span v-else>{{ m.photos.length ? '🎬' : m.emoji }}</span></span>
         <span class="row-text"><small class="date">{{ m.emoji }} {{ displayDate(m.date) }}</small><strong>{{ m.title }}</strong><small class="clamp">{{ m.story }}</small></span>
         <CharacterAvatar :user="member(m.author)" :size="32" :title="m.author_name" />
         <ChevronRight :size="20" />

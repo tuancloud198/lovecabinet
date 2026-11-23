@@ -6,8 +6,8 @@ const percent = computed(() => Math.round(Math.min(1, (props.done + props.part) 
 </script>
 
 <template>
-  <div class="upload-progress" role="progressbar" :aria-valuenow="percent" aria-valuemin="0" aria-valuemax="100" :aria-label="`Đã tải ${done}/${total} ảnh`">
-    <div class="upload-progress-label"><span>Đã tải {{ done }}/{{ total }} ảnh</span><span>{{ percent }}%</span></div>
+  <div class="upload-progress" role="progressbar" :aria-valuenow="percent" aria-valuemin="0" aria-valuemax="100" :aria-label="`Đã tải ${done}/${total} ảnh/video`">
+    <div class="upload-progress-label"><span>Đã tải {{ done }}/{{ total }} ảnh/video</span><span>{{ percent }}%</span></div>
     <div class="upload-progress-track"><div class="upload-progress-bar" :style="{ width: `${percent}%` }"></div></div>
   </div>
 </template>

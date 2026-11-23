@@ -58,3 +58,11 @@ export async function uploadablePhoto(file) {
     URL.revokeObjectURL(url)
   }
 }
+
+// Videos (MP4/MOV/WebM) are uploaded as they are and played from their signed `stream_url`.
+export const isVideoFile = file => /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm)$/i.test(file.name)
+export const isVideo = item => item?.kind === 'video'
+/** A memory's photos and videos in the order they were added (the API lists newest first). */
+export const mediaOf = memory => [...(memory?.photos ?? [])].sort((a, b) => a.id - b.id)
+/** The picture shown for a memory in lists: its first photo (videos can't be a thumbnail image). */
+export const coverPhoto = memory => mediaOf(memory).find(p => !isVideo(p))

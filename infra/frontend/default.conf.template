@@ -1,7 +1,7 @@
 server {
     listen 80;
     server_name _;
-    client_max_body_size 85m;
+    client_max_body_size 210m; # videos up to 200 MB
     root /usr/share/nginx/html;
     location /api/ {
         proxy_pass ${BACKEND_URL};

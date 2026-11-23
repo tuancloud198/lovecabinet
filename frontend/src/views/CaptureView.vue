@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
-import { Amphora, Camera, ImagePlus, X } from 'lucide-vue-next'
+import { Amphora, Camera, ImagePlus, Play, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { isoDate } from '@/format.js'
 import { state, navigate, run, load, toast } from '@/store.js'
@@ -9,18 +9,19 @@ import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
-import { uploadablePhoto } from '@/photos.js'
+import { isVideoFile, uploadablePhoto } from '@/photos.js'
 
 const props = defineProps({ jarId: Number })
 const jars = computed(() => [...state.jars].sort((a, b) => b.id - a.id))
 const form = ref({ jar: props.jarId || jars.value[0]?.id, title: '', story: '', date: isoDate(), emoji: '❤️' })
-const photos = ref([]) // [{ file, url, token? }]; token = already uploaded (staged)
+const photos = ref([]) // [{ file, url, video, token? }]; token = already uploaded (staged)
+const images = computed(() => photos.value.filter(p => !p.video)) // the viewer shows photos only
 const current = ref(0)
 const viewing = ref(false)
 const progress = ref(null) // { done, total, part } while uploading
 
 function pick(event) {
-  for (const file of event.target.files) photos.value.push({ file, url: URL.createObjectURL(file) })
+  for (const file of event.target.files) photos.value.push({ file, url: URL.createObjectURL(file), video: isVideoFile(file) })
   current.value = Math.max(0, photos.value.length - 1)
   event.target.value = ''
 }
@@ -68,28 +69,32 @@ function save() {
 
     <form v-else class="capture" @submit.prevent="save">
       <div class="photo-frame">
-        <button v-if="photos.length" type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
+        <video v-if="photos.length && photos[current].video" :key="photos[current].url" class="photo-video" :src="photos[current].url" controls playsinline preload="metadata"></video>
+        <button v-else-if="photos.length" type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
           <img v-if="!photos[current].noPreview" :src="photos[current].url" alt="Ảnh đã chọn" @error="photos[current].noPreview = true" />
           <span v-else class="photo-placeholder">📷</span> <!-- e.g. HEIC outside Safari: uploads fine, the server converts it -->
         </button>
         <div v-else class="photo-empty">
           <Camera :size="40" />
           <div class="photo-buttons">
-            <label class="btn primary small"><Camera :size="16" /> Chụp ảnh<input type="file" accept="image/*" capture="environment" @change="pick" /></label>
-            <label class="btn outline small"><ImagePlus :size="16" /> Thư viện<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple @change="pick" /></label>
+            <label class="btn primary small"><Camera :size="16" /> Chụp / quay<input type="file" accept="image/*,video/*" capture="environment" @change="pick" /></label>
+            <label class="btn outline small"><ImagePlus :size="16" /> Thư viện<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" multiple @change="pick" /></label>
           </div>
-          <small>JPEG, PNG, WebP, HEIC · tối đa 80 MB/ảnh</small>
+          <small>Ảnh JPEG, PNG, WebP, HEIC · tối đa 80 MB<br />Video MP4, MOV, WebM · tối đa 200 MB</small>
         </div>
       </div>
       <div v-if="photos.length" class="thumb-strip">
         <span v-for="(p, i) in photos" :key="p.url" class="thumb-wrap" :class="{ chosen: current === i }">
-          <button type="button" :aria-label="`Ảnh ${i + 1}`" @click="current = i"><img v-if="!p.noPreview" :src="p.url" alt="" @error="p.noPreview = true" /><span v-else class="photo-placeholder">📷</span></button>
-          <button type="button" class="thumb-remove" aria-label="Bỏ ảnh" @click="drop(i)"><X :size="12" /></button>
+          <button type="button" :aria-label="p.video ? `Video ${i + 1}` : `Ảnh ${i + 1}`" @click="current = i">
+            <span v-if="p.video" class="thumb-video"><video :src="`${p.url}#t=0.1`" muted playsinline preload="metadata"></video><Play :size="16" fill="currentColor" /></span>
+            <img v-else-if="!p.noPreview" :src="p.url" alt="" @error="p.noPreview = true" /><span v-else class="photo-placeholder">📷</span>
+          </button>
+          <button type="button" class="thumb-remove" :aria-label="p.video ? 'Bỏ video' : 'Bỏ ảnh'" @click="drop(i)"><X :size="12" /></button>
         </span>
-        <label class="thumb-add" aria-label="Thêm ảnh từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple @change="pick" /></label>
-        <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" @change="pick" /></label>
+        <label class="thumb-add" aria-label="Thêm ảnh hoặc video từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" multiple @change="pick" /></label>
+        <label class="thumb-add" aria-label="Chụp thêm ảnh hoặc quay video"><Camera :size="20" /><input type="file" accept="image/*,video/*" capture="environment" @change="pick" /></label>
       </div>
-      <PhotoViewer v-if="viewing && photos.length" :urls="photos.map(p => p.url)" :start="current" @close="viewing = false" />
+      <PhotoViewer v-if="viewing && images.length" :urls="images.map(p => p.url)" :start="Math.max(0, images.indexOf(photos[current]))" @close="viewing = false" />
 
       <section class="sheet-section stack">
         <div class="field"><span class="field-title">Chọn emoji cho kỷ niệm này</span><EmojiPicker v-model="form.emoji" /></div>

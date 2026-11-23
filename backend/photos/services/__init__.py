@@ -1,8 +1,10 @@
+import time
 import uuid
 import boto3
 from botocore.config import Config
 from django.conf import settings
 from django.core import signing
+from django.utils.crypto import constant_time_compare
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
@@ -12,7 +14,7 @@ from photos.models import Photo
 
 def storage():
     return boto3.client('s3', endpoint_url=settings.MINIO_ENDPOINT, aws_access_key_id=settings.MINIO_ACCESS_KEY, aws_secret_access_key=settings.MINIO_SECRET_KEY, region_name=settings.MINIO_REGION, config=Config(signature_version='s3v4'))
-EXTENSIONS = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}
+EXTENSIONS = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm'}
 
 def object_key(memory, content_type):
     """{jar id}/{memory id}/{random}.{ext}: grouped per jar and memory; the random name lets a memory hold many photos."""
@@ -82,6 +84,27 @@ def relocate_photos(memory):
         client.copy_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': old})
         photo.save(update_fields=['object_key'])
         client.delete_object(Bucket=settings.MINIO_BUCKET, Key=old)
+
+# Videos play from a plain <video src>, which can't send the Authorization header, so each video
+# gets a signed link. The signature covers the photo id and a 6-hour window (stable within the
+# window, so the URL doesn't change on every refresh) and is accepted for the next window too.
+STREAM_SALT = 'photos.stream'
+STREAM_WINDOW = 6 * 3600
+
+def _stream_signature(pk, offset=0):
+    window = int(time.time() // STREAM_WINDOW) - offset
+    return signing.Signer(salt=STREAM_SALT).signature(f'{pk}:{window}')
+
+def stream_url(photo):
+    return f'/api/photos/{photo.pk}/stream/?sig={_stream_signature(photo.pk)}'
+
+def valid_stream_signature(pk, sig):
+    return any(constant_time_compare(sig or '', _stream_signature(pk, offset)) for offset in (0, 1))
+
+def read_range(photo, byte_range=None):
+    """The object (or one byte range of it, e.g. 'bytes=0-1023') as an S3 get_object response."""
+    extra = {'Range': byte_range} if byte_range else {}
+    return storage().get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key, **extra)
 
 def read_photo(photo):
     return storage().get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key)['Body']

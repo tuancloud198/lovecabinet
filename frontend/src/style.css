@@ -365,3 +365,11 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .upload-progress-track { height: 8px; border-radius: 999px; background: var(--primary-light); overflow: hidden; }
 .upload-progress-bar { height: 100%; border-radius: inherit; background: var(--primary); transition: width .2s ease; }
 .app-version { text-align: center; font-size: 11px; color: var(--muted); margin-top: 12px; }
+
+/* Videos in memories */
+.photo-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.photo-delete { position: absolute; top: 10px; right: 10px; z-index: 1; width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(51, 41, 35, .55); color: #fff; }
+.photo-delete:hover { background: var(--primary); }
+.thumb-video { position: relative; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; background: #2b2220; color: #fff; }
+.thumb-video video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.thumb-video svg { position: relative; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }

@@ -1,11 +1,15 @@
-from django.http import FileResponse
+import re
+from botocore.exceptions import ClientError
+from django.http import FileResponse, HttpResponse, HttpResponseForbidden, StreamingHttpResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_GET
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from common.services import couple_for
 from photos.models import Photo
 from photos.serializers.photo_serializers import PhotoSerializer, StageSerializer, UploadSerializer
-from photos.services import upload_photo, stage_photo, read_photo, delete_photo
+from photos.services import upload_photo, stage_photo, read_photo, read_range, delete_photo, valid_stream_signature
 class PhotoViewSet(viewsets.GenericViewSet):
     serializer_class = PhotoSerializer
     def get_queryset(self):
@@ -31,3 +35,29 @@ class PhotoViewSet(viewsets.GenericViewSet):
     def destroy(self, request, pk=None):
         delete_photo(self.get_object())
         return Response(status=204)
+
+RANGE = re.compile(r'^bytes=(\d+-\d*|-\d+)$')
+
+@require_GET
+def stream(request, pk):
+    """Play a video: authorised by the signed link from PhotoSerializer.stream_url (a <video> can't
+    send the API token) and supports Range requests so browsers can seek and stream."""
+    if not valid_stream_signature(pk, request.GET.get('sig')):
+        return HttpResponseForbidden()
+    photo = get_object_or_404(Photo, pk=pk, content_type__startswith='video/')
+    byte_range = request.headers.get('Range', '')
+    try:
+        obj = read_range(photo, byte_range if RANGE.match(byte_range) else None)
+    except ClientError as error:
+        if error.response.get('Error', {}).get('Code') == 'InvalidRange':
+            return HttpResponse(status=416)
+        raise
+    partial = 'ContentRange' in obj
+    response = StreamingHttpResponse(obj['Body'].iter_chunks(256 * 1024), status=206 if partial else 200, content_type=photo.content_type)
+    response['Content-Length'] = obj['ContentLength']
+    if partial:
+        response['Content-Range'] = obj['ContentRange']
+    response['Accept-Ranges'] = 'bytes'
+    response['Cache-Control'] = 'private, max-age=3600'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response

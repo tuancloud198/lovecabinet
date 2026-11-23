@@ -255,6 +255,50 @@ class WorkflowTests(APITestCase):
         # Tokens are bound to the uploader.
         self.auth(self.other)
         self.assertEqual(self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('x.png', data.getvalue(), content_type='image/png')}, format='multipart').status_code, 400)  # not paired
+    @patch('photos.services.storage')
+    def test_video_upload_stream_and_delete(self, storage):
+        from botocore.exceptions import ClientError
+        memory = self.setup_memory()
+        mp4 = b'\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom' + b'\x00' * 64
+        mov = b'\x00\x00\x00\x14ftypqt  \x00\x00\x00\x00qt  ' + b'\x00' * 64
+        for name, data, ctype, ext in [('clip.mp4', mp4, 'video/mp4', 'mp4'), ('IMG_0001.MOV', mov, 'video/quicktime', 'mov')]:
+            response = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile(name, data, content_type='application/octet-stream')}, format='multipart')
+            self.assertEqual(response.status_code, 201, response.data)
+            self.assertEqual(response.data['kind'], 'video')
+            photo = Photo.objects.get(pk=response.data['id'])
+            self.assertEqual(photo.content_type, ctype)
+            self.assertTrue(photo.object_key.endswith('.' + ext))
+            self.assertEqual(storage.return_value.upload_fileobj.call_args.kwargs['ExtraArgs'], {'ContentType': ctype})
+        # Random bytes are still rejected; a HEIF brand is never mistaken for video.
+        self.assertEqual(self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('x.mp4', b'not a video at all', content_type='video/mp4')}, format='multipart').status_code, 400)
+        self.assertEqual(self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('x.heic', b'\x00\x00\x00\x18ftypheic' + b'\x00' * 40, content_type='image/heic')}, format='multipart').status_code, 400)
+        # Streaming: signed link, Range support, no API token needed.
+        url = self.client.get(f'/api/memories/{memory.pk}/').data['photos'][0]['stream_url']
+        self.assertIn('/stream/?sig=', url)
+        self.client.force_authenticate(None)
+        body = MagicMock(); body.iter_chunks.return_value = [b'ab']
+        storage.return_value.get_object.return_value = {'Body': body, 'ContentLength': 2, 'ContentRange': 'bytes 0-1/90'}
+        response = self.client.get(url, HTTP_RANGE='bytes=0-1')
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual((response['Content-Range'], response['Content-Length'], response['Accept-Ranges']), ('bytes 0-1/90', '2', 'bytes'))
+        self.assertEqual(b''.join(response.streaming_content), b'ab')
+        self.assertEqual(storage.return_value.get_object.call_args.kwargs['Range'], 'bytes=0-1')
+        storage.return_value.get_object.return_value = {'Body': body, 'ContentLength': 90}
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertNotIn('Range', storage.return_value.get_object.call_args.kwargs)
+        storage.return_value.get_object.side_effect = ClientError({'Error': {'Code': 'InvalidRange'}}, 'GetObject')
+        self.assertEqual(self.client.get(url, HTTP_RANGE='bytes=999-').status_code, 416)
+        storage.return_value.get_object.side_effect = None
+        self.assertEqual(self.client.get(url.split('?')[0] + '?sig=forged').status_code, 403)
+        image = Photo.objects.create(memory=memory, object_key='x/y/z.jpg', content_type='image/jpeg')
+        from photos.services import stream_url
+        self.assertEqual(self.client.get(stream_url(image)).status_code, 404)  # images aren't streamed
+        # Either partner can delete a video.
+        partner = self.bob if memory.author == self.alice else self.alice
+        self.auth(partner)
+        video_id = Photo.objects.filter(content_type__startswith='video/').first().pk
+        self.assertEqual(self.client.delete(f'/api/photos/{video_id}/').status_code, 204)
+        self.assertFalse(Photo.objects.filter(pk=video_id).exists())
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

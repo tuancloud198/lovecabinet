@@ -8,6 +8,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
+import { coverPhoto } from '@/photos.js'
 
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
 const today = isoDate()
@@ -97,7 +98,7 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
         <p v-if="!dayMemories.length" class="muted">Chưa có kỷ niệm nào vào ngày này.</p>
         <div v-else>
           <button v-for="m in dayMemories" :key="m.id" class="memory-row card" @click="navigate('memory', { id: m.id })">
-            <span class="thumb"><PrivatePhoto v-if="m.photos[0]" :url="m.photos[0].url" /><span v-else>{{ m.emoji }}</span></span>
+            <span class="thumb"><PrivatePhoto v-if="coverPhoto(m)" :url="coverPhoto(m).url" /><span v-else>{{ m.photos.length ? '🎬' : m.emoji }}</span></span>
             <span class="row-text"><small class="date">{{ m.emoji }} {{ m.author_name }}</small><strong>{{ m.title }}</strong><small class="clamp">{{ m.story }}</small></span>
             <ChevronRight :size="20" />
           </button>
