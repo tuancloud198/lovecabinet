@@ -12,7 +12,8 @@ register_heif_opener()  # lets Pillow read HEIC/HEIF (iPhone photos)
 MAX_UPLOAD_MB = 80  # full-size phone photos (HEIF, 48 MP, ProRAW-derived) can be large; browsers usually shrink them first
 MAX_VIDEO_MB = 200
 MAX_SIDE = 4096  # long edge of a converted HEIF photo
-FORMATS = {'JPEG': 'image/jpeg', 'PNG': 'image/png', 'WEBP': 'image/webp'}
+# MPO: a JPEG with extra embedded images (iPhone HDR gain map, the `AMPF` segment); browsers show it as a JPEG.
+FORMATS = {'JPEG': 'image/jpeg', 'MPO': 'image/jpeg', 'PNG': 'image/png', 'WEBP': 'image/webp'}
 
 # ISO-BMFF brands that are still images (HEIF/AVIF); any other `ftyp` file is treated as MP4/MOV video.
 IMAGE_BRANDS = {b'heic', b'heix', b'heim', b'heis', b'hevc', b'hevx', b'mif1', b'msf1', b'avif', b'avis', b'crx '}

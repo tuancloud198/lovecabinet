@@ -214,6 +214,15 @@ class WorkflowTests(APITestCase):
         stored = Image.open(fileobj)
         self.assertEqual((stored.format, stored.width), ('JPEG', 4096))  # downscaled to MAX_SIDE
     @patch('photos.services.storage')
+    def test_iphone_mpo_jpeg_is_accepted(self, storage):  # JPEG + HDR gain map; Pillow reports MPO
+        memory = self.setup_memory()
+        data = BytesIO()
+        Image.new('RGB', (64, 48), 'red').save(data, format='MPO', save_all=True, append_images=[Image.new('L', (32, 24))])
+        self.assertEqual(Image.open(BytesIO(data.getvalue())).format, 'MPO')
+        response = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('IMG_2516.jpeg', data.getvalue(), content_type='image/jpeg')}, format='multipart')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Photo.objects.get(pk=response.data['id']).content_type, 'image/jpeg')
+    @patch('photos.services.storage')
     def test_memory_created_only_with_all_staged_photos(self, storage):
         self.pair()
         cabinet = Cabinet.objects.get()
