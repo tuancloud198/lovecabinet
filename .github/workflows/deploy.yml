@@ -1,0 +1,143 @@
+# Test, build and deploy Love Cabinet to the `lovecabinet` EC2 VM.
+#
+#   push to main ─▶ build & push images (GitHub Container Registry, tag sha-<commit>) ─▶ deploy via AWS SSM
+#
+# The deploy runs on the VM (no SSH): it writes the image location and new tags into
+# /opt/lovecabinet/.env, pulls the
+# images, runs `docker compose up -d` (migrations run first), waits for the backend to be healthy,
+# and rolls back to the previous tags if it isn't.
+#
+# Fill in before the first run (Settings ▸ Secrets and variables ▸ Actions ▸ Variables):
+#   AWS_DEPLOY_ROLE_ARN    IAM role GitHub assumes via OIDC; needs ssm:SendCommand on the instance
+#                          (+ document AWS-RunShellScript) and ssm:GetCommandInvocation
+#   EC2_INSTANCE_ID        the app VM, e.g. i-09f4a1839c863ad61
+# Images are pushed with the workflow's own GITHUB_TOKEN (no registry secret). If the packages are
+# private, log the VM in once: docker login ghcr.io -u <github user> (token with read:packages).
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # never interrupt a deploy half-way
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to ghcr.io with GITHUB_TOKEN
+    strategy:
+      matrix:
+        app: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: |
+          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "prefix=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT" # registry names must be lowercase
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/${{ matrix.app }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: APP_VERSION=${{ steps.tag.outputs.tag }} # shown on the Profile page
+          tags: |
+            ${{ steps.tag.outputs.prefix }}/lovecabinet-${{ matrix.app }}:${{ steps.tag.outputs.tag }}
+            ${{ steps.tag.outputs.prefix }}/lovecabinet-${{ matrix.app }}:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }} # links the package to this repo
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # GitHub OIDC -> AWS role, no stored AWS keys
+    env:
+      INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+    steps:
+      - run: |
+          echo "TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy on the VM (AWS SSM)
+        run: |
+          # Script run on the VM as root by SSM (POSIX sh). __TAG__ and __PREFIX__ are filled in below.
+          cat > deploy.sh <<'SCRIPT'
+          set -eu
+          cd /opt/lovecabinet
+          TAG='__TAG__'
+          PREFIX='__PREFIX__'
+          prev_prefix=$(sed -n 's/^IMAGE_PREFIX=//p' .env)
+          prev_backend=$(sed -n 's/^BACKEND_TAG=//p' .env)
+          prev_frontend=$(sed -n 's/^FRONTEND_TAG=//p' .env)
+          set_tags() {
+            sed -i -e "s/^BACKEND_TAG=.*/BACKEND_TAG=$1/" -e "s/^FRONTEND_TAG=.*/FRONTEND_TAG=$2/" -e '/^IMAGE_PREFIX=/d' .env
+            [ -z "$3" ] || echo "IMAGE_PREFIX=$3" >> .env
+          }
+          healthy() {
+            for i in $(seq 1 36); do
+              [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q backend)" 2>/dev/null)" = healthy ] && return 0
+              sleep 5
+            done
+            return 1
+          }
+          echo "Deploying $PREFIX:$TAG (was ${prev_prefix:-docker.io/tuanlg198}: backend $prev_backend, frontend $prev_frontend)"
+          set_tags "$TAG" "$TAG" "$PREFIX"
+          if docker compose pull -q backend frontend && docker compose up -d && healthy; then
+            docker image prune -f >/dev/null
+            docker compose ps --format '{{.Service}}: {{.Image}} {{.Status}}'
+            echo "Deployed $TAG"
+            exit 0
+          fi
+          echo "Deploy of $TAG failed, rolling back" >&2
+          docker compose logs --tail 40 migrate backend >&2 || true
+          set_tags "$prev_backend" "$prev_frontend" "$prev_prefix"
+          docker compose up -d
+          exit 1
+          SCRIPT
+          sed -i -e "s|__TAG__|$TAG|" -e "s|__PREFIX__|$IMAGE_PREFIX|" deploy.sh
+          jq -n --rawfile script deploy.sh '{commands: [$script], executionTimeout: ["900"]}' > params.json
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "lovecabinet deploy $TAG" \
+            --parameters file://params.json \
+            --query Command.CommandId --output text)
+          echo "SSM command $COMMAND_ID"
+
+          # Wait for the command to finish (up to ~15 min), then show its output.
+          for i in $(seq 1 180); do
+            STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in Pending|InProgress|Delayed) sleep 5 ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text
+          echo "Status: $STATUS"
+          [ "$STATUS" = Success ]
