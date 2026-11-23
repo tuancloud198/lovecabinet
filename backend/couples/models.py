@@ -9,6 +9,7 @@ class Couple(Timestamped):
     dating_since = models.DateField(null=True, blank=True)
     pet_name = models.CharField(max_length=50, default='Bờm')
     pet_type = models.CharField(max_length=20, choices=PET_TYPES, default='dog')
+    pet_points = models.PositiveIntegerField(default=0)  # earned outside memories (quiz answers); memories count on top
 class Membership(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='membership')
     couple = models.ForeignKey(Couple, on_delete=models.CASCADE, related_name='memberships')

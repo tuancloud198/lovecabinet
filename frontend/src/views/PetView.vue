@@ -2,13 +2,13 @@
 import { ref, computed } from 'vue'
 import { ArrowRight, Pencil } from 'lucide-vue-next'
 import { api } from '@/api.js'
-import { petStatus, STAGES, stageLabel } from '@/characters.js'
+import { MEMORY_POINTS, petStatus, QUIZ_POINTS, STAGES, stageLabel } from '@/characters.js'
 import { state, navigate, run, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import PetArt from '@/components/PetArt.vue'
 
-const pet = computed(() => petStatus(state.memories))
+const pet = computed(() => petStatus(state.memories, state.couple.pet_points || 0))
 const name = computed(() => state.couple.pet_name)
 const remaining = computed(() => pet.value.target - pet.value.count)
 
@@ -47,10 +47,12 @@ function save() {
           <span class="progress-fill" :style="{ width: Math.min(100, (pet.count / pet.target) * 100) + '%' }"></span>
           <PetArt mood="happy" face class="progress-pet" />
         </div>
-        <p class="progress-text"><strong>{{ pet.count }} / {{ pet.target }}</strong></p>
-        <p class="muted center">{{ pet.next ? `Còn ${remaining} kỷ niệm để lên giai đoạn ${pet.next.label} nhé!` : `Còn ${remaining} kỷ niệm để lên cấp ${pet.level + 1} nhé!` }}</p>
+        <p class="progress-text"><strong>{{ pet.count }} / {{ pet.target }} điểm</strong></p>
+        <p class="muted center">{{ pet.next ? `Còn ${remaining} điểm để lên giai đoạn ${pet.next.label} nhé!` : `Còn ${remaining} điểm để lên cấp ${pet.level + 1} nhé!` }}</p>
+        <p class="muted center pet-points-hint">Mỗi kỷ niệm +{{ MEMORY_POINTS }} điểm · mỗi câu đố được trả lời +{{ QUIZ_POINTS }} điểm</p>
       </div>
       <button class="btn primary block" @click="navigate('capture')">Lưu thêm kỷ niệm để nuôi {{ name }} lớn lên ♡</button>
+      <button class="btn outline block" @click="navigate('quiz')">Chơi đố vui để thêm điểm cho {{ name }}</button>
     </div>
     <ol class="stage-row" aria-label="Các giai đoạn phát triển">
       <template v-for="(stage, i) in STAGES" :key="stage.label">

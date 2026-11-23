@@ -348,6 +348,46 @@ class WorkflowTests(APITestCase):
         self.assertEqual(self.client.patch(url, {'met_on': future}, format='json').status_code, 400)
         self.auth(self.alice)  # either partner can change them
         self.assertEqual(self.client.patch(url, {'met_on': None}, format='json').data['met_on'], None)
+    def test_quiz_ask_answer_points_and_streak(self):
+        from couples.models import Couple
+        from quizzes.models import Answer, Question
+        from quizzes.services import streaks
+        self.pair()
+        self.auth(self.alice)
+        bad = self.client.post('/api/quiz-questions/', {'text': 'Màu mình thích?', 'choices': ['Đỏ', 'đỏ'], 'correct': 0}, format='json')
+        self.assertEqual(bad.status_code, 400)  # duplicate choices
+        self.assertEqual(self.client.post('/api/quiz-questions/', {'text': 'Màu?', 'choices': ['Đỏ', 'Xanh'], 'correct': 2}, format='json').status_code, 400)
+        q = self.client.post('/api/quiz-questions/', {'text': 'Màu mình thích?', 'choices': ['Đỏ', 'Xanh', 'Tím'], 'correct': 2}, format='json')
+        self.assertEqual((q.status_code, q.data['author'], q.data['correct']), (201, self.alice.id, 2))
+        url = f"/api/quiz-questions/{q.data['id']}/"
+        self.assertEqual(self.client.post(url + 'answer/', {'choice': 2}, format='json').status_code, 403)  # not your own
+        self.auth(self.bob)
+        self.assertIsNone(self.client.get(url).data['correct'])  # hidden until answered
+        self.assertEqual(self.client.delete(url).status_code, 403)  # only the author deletes
+        response = self.client.post(url + 'answer/', {'choice': 1}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.data['question']['correct'], response.data['question']['answer']['correct'], response.data['points'], response.data['streak']), (2, False, 2, 1))
+        self.assertEqual(self.client.post(url + 'answer/', {'choice': 2}, format='json').status_code, 400)  # only once
+        couple = Couple.objects.get()
+        self.assertEqual(couple.pet_points, 2)
+        self.assertEqual(self.client.patch(f'/api/couples/{couple.pk}/', {'pet_points': 999}, format='json').data['pet_points'], 2)  # read-only
+        self.auth(self.alice)
+        self.assertEqual(self.client.delete(url).status_code, 400)  # answered: kept as history
+        # Streak: days with any answer, by either partner.
+        today = timezone.localdate()
+        def answered(days_ago):
+            question = Question.objects.create(couple=couple, author=self.alice, text='?', choices=['a', 'b'], correct=0)
+            Answer.objects.create(question=question, user=self.bob, choice=0, answered_on=today - timedelta(days=days_ago))
+        for days_ago in (1, 2, 5, 6, 7, 8):  # plus today's answer above
+            answered(days_ago)
+        self.assertEqual(streaks(couple), (3, 4))
+        self.assertEqual(streaks(couple, today + timedelta(days=1)), (3, 4))  # still alive until the day ends
+        self.assertEqual(streaks(couple, today + timedelta(days=2)), (0, 4))
+        data = self.client.get('/api/couples/').data[0]
+        self.assertEqual((data['quiz_streak'], data['quiz_max_streak']), (3, 4))
+        self.auth(self.other)  # not in this couple: can't see or answer it
+        self.assertIn(self.client.get(url).status_code, (400, 404))
+        self.assertIn(self.client.post(url + 'answer/', {'choice': 0}, format='json').status_code, (400, 404))
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

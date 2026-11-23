@@ -9,10 +9,14 @@ export function characterOf(user) {
   return (user?.id ?? 0) % 2 ? 'male' : 'female'
 }
 
+// Pet points: each memory is worth MEMORY_POINTS, each answered quiz question 2 (couple.pet_points).
+export const MEMORY_POINTS = 10
+export const QUIZ_POINTS = 2
+const LEVEL_POINTS = 100
 export const STAGES = [
   { label: 'Bé', levels: 'Cấp 1–3', min: 0 },
-  { label: 'Lớn dần', levels: 'Cấp 4–6', min: 30 },
-  { label: 'Trưởng thành', levels: 'Cấp 7+', min: 60 },
+  { label: 'Lớn dần', levels: 'Cấp 4–6', min: 300 },
+  { label: 'Trưởng thành', levels: 'Cấp 7+', min: 600 },
 ]
 const MOODS = [
   { maxDays: 0, face: 'excited', text: 'Phấn khích! Hôm nay có kỷ niệm mới' },
@@ -21,20 +25,20 @@ const MOODS = [
   { maxDays: Infinity, face: 'neutral', text: 'Nhớ hai bạn quá, lưu kỷ niệm đi mà' },
 ]
 
-/** Pet growth: one level per 10 memories; stages at 30 and 60 memories. */
-export function petStatus(memories) {
-  const count = memories.length
+/** Pet growth: one level per 100 points (10 memories); stages at 300 and 600 points. */
+export function petStatus(memories, bonusPoints = 0) {
+  const count = memories.length * MEMORY_POINTS + bonusPoints
   const stageIndex = STAGES.findLastIndex(stage => count >= stage.min)
   const next = STAGES[stageIndex + 1]
   const latest = memories.reduce((max, m) => (m.created_at > max ? m.created_at : max), '')
   const days = latest ? Math.floor((Date.now() - new Date(latest)) / 86400000) : Infinity
   return {
     count,
-    level: Math.floor(count / 10) + 1,
+    level: Math.floor(count / LEVEL_POINTS) + 1,
     stageIndex,
     stage: STAGES[stageIndex],
     next,
-    target: next ? next.min : (Math.floor(count / 10) + 1) * 10,
+    target: next ? next.min : (Math.floor(count / LEVEL_POINTS) + 1) * LEVEL_POINTS,
     mood: MOODS.find(mood => days <= mood.maxDays),
   }
 }

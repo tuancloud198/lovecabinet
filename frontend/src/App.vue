@@ -13,10 +13,11 @@ import PairingView from '@/views/PairingView.vue'
 import PetView from '@/views/PetView.vue'
 import ProfileSetupView from '@/views/ProfileSetupView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import QuizView from '@/views/QuizView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
 
-const views = { cabinet: CabinetView, calendar: CalendarView, capture: CaptureView, jar: JarView, map: MapView, memory: MemoryView, pet: PetView, profile: ProfileView }
-const TABS = ['calendar', 'cabinet', 'pet', 'profile']
+const views = { cabinet: CabinetView, calendar: CalendarView, capture: CaptureView, jar: JarView, map: MapView, memory: MemoryView, pet: PetView, profile: ProfileView, quiz: QuizView }
+const TABS = ['calendar', 'cabinet', 'quiz', 'pet', 'profile']
 const showNav = computed(() => TABS.includes(state.view.name))
 const viewKey = computed(() => state.view.name + JSON.stringify(state.view.params))
 

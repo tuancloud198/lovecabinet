@@ -5,6 +5,8 @@ from couples.models import Couple
 class CoupleSerializer(serializers.ModelSerializer):
     members = serializers.SerializerMethodField()
     memory_count = serializers.SerializerMethodField()
+    quiz_streak = serializers.SerializerMethodField()
+    quiz_max_streak = serializers.SerializerMethodField()
     def validate(self, attrs):
         met = attrs.get('met_on', getattr(self.instance, 'met_on', None))
         since = attrs.get('dating_since', getattr(self.instance, 'dating_since', None))
@@ -14,6 +16,15 @@ class CoupleSerializer(serializers.ModelSerializer):
         if met and since and since < met:
             raise serializers.ValidationError('Ngày yêu nhau phải sau ngày gặp nhau.')
         return attrs
+    def _streaks(self, obj):
+        if not hasattr(obj, '_streaks'):
+            from quizzes.services import streaks
+            obj._streaks = streaks(obj)
+        return obj._streaks
+    def get_quiz_streak(self, obj):
+        return self._streaks(obj)[0]
+    def get_quiz_max_streak(self, obj):
+        return self._streaks(obj)[1]
     def get_members(self, obj):
         return UserSerializer([m.user for m in obj.memberships.select_related('user')], many=True).data
     def get_memory_count(self, obj):
@@ -21,4 +32,5 @@ class CoupleSerializer(serializers.ModelSerializer):
         return Memory.objects.filter(jar__cabinet__couple=obj).count()
     class Meta:
         model = Couple
-        fields = ['id', 'name', 'met_on', 'dating_since', 'pet_name', 'pet_type', 'members', 'memory_count']
+        fields = ['id', 'name', 'met_on', 'dating_since', 'pet_name', 'pet_type', 'pet_points', 'quiz_streak', 'quiz_max_streak', 'members', 'memory_count']
+        read_only_fields = ['pet_points']
