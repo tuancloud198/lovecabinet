@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Bell, Heart, MessageCircle, Play, Plus } from 'lucide-vue-next'
+import { Bell, Heart, Map as MapIcon, MessageCircle, Play, Plus } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { timeAgo } from '@/format.js'
 import { state, partner, navigate, run, cabinetForYear, toast } from '@/store.js'
@@ -80,7 +80,10 @@ function saveJar() {
       <CharacterAvatar :user="partner" :size="56" />
       <span class="visually-hidden">Tủ chung của {{ state.me.display_name }} và {{ partner?.display_name }}</span>
     </div>
-    <button v-if="state.memories.length" class="chip replay-chip" @click="choosingRange = true"><Play :size="14" fill="currentColor" /> Xem lại kỷ niệm</button>
+    <div v-if="state.memories.length" class="cabinet-actions">
+      <button class="chip replay-chip" @click="choosingRange = true"><Play :size="14" fill="currentColor" /> Xem lại kỷ niệm</button>
+      <button class="chip replay-chip" @click="navigate('map')"><MapIcon :size="14" /> Bản đồ</button>
+    </div>
     <ReplayRangeSheet v-if="choosingRange" @start="replayRange" @close="choosingRange = false" />
     <ReplayPlayer v-if="replaying" :memories="replaying" @close="replaying = null" />
 

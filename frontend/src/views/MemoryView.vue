@@ -1,12 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Camera, Heart, ImagePlus, Play, Send, Trash2, X } from 'lucide-vue-next'
+import { Camera, Heart, ImagePlus, MapPin, Pencil, Play, Send, Trash2, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
+import { firstPhotoLocation, hasLocation, placeName } from '@/location.js'
 import { forgetPhoto, isVideo, mediaOf, uploadablePhoto } from '@/photos.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
+import LocationPicker from '@/components/LocationPicker.vue'
+import MiniMap from '@/components/MiniMap.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
@@ -24,6 +27,17 @@ const progress = ref(null) // { done, total, part } while adding photos
 const comment = ref('')
 const member = id => state.couple.members.find(m => m.id === id)
 const back = () => navigate('jar', { id: memory.value?.jar })
+const editingLocation = ref(false)
+
+const pinTo = location => api(`memories/${props.id}/`, { method: 'PATCH', body: location ?? { latitude: null, longitude: null } })
+function saveLocation(location) {
+  editingLocation.value = false
+  run(async () => {
+    await pinTo(location)
+    await load()
+    toast(location ? 'Đã lưu địa điểm.' : 'Đã bỏ địa điểm.')
+  })
+}
 
 function react() {
   run(async () => { await api(`memories/${props.id}/react/`, { method: 'POST' }); await load() })
@@ -40,6 +54,9 @@ function addPhotos(event) {
   event.target.value = ''
   if (!files.length) return
   run(async () => {
+    // A memory without a location takes the GPS of the first new photo that has one (read before
+    // uploadablePhoto() re-encodes and drops the metadata).
+    const gps = hasLocation(memory.value) ? null : await firstPhotoLocation(files)
     progress.value = { done: 0, total: files.length, part: 0 }
     try {
       for (const file of files) {
@@ -49,12 +66,13 @@ function addPhotos(event) {
         await upload('photos/', body, part => { progress.value.part = part })
         progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
       }
+      if (gps) await pinTo({ ...gps, place: await placeName(gps) })
       await new Promise(resolve => setTimeout(resolve, 700)) // let "5/5 · 100%" be seen
     } finally {
       await load() // show whatever was uploaded, even if a later photo failed
     }
     photo.value = media.value.length - 1 // show the newest item
-    toast(`Đã thêm ${files.length} ảnh/video.`)
+    toast(`Đã thêm ${files.length} ảnh/video${gps ? ' và ghim vị trí từ ảnh' : ''}.`)
   })
 }
 function removePhoto(p) {
@@ -110,6 +128,18 @@ function remove() {
       <h2 class="memory-title">{{ memory.emoji }} {{ memory.title }}</h2>
       <p class="muted">{{ memory.author_name }} · {{ timeAgo(memory.created_at) }}</p>
       <p v-if="memory.story" class="story">{{ memory.story }}</p>
+      <div v-if="hasLocation(memory)" class="location-card">
+        <button type="button" class="location-open" aria-label="Xem trên bản đồ" @click="navigate('map', { focus: memory.id })">
+          <MiniMap :latitude="memory.latitude" :longitude="memory.longitude" />
+        </button>
+        <div class="location-row">
+          <MapPin :size="18" class="location-icon" />
+          <span class="location-text">{{ memory.place || 'Đã ghim vị trí' }}</span>
+          <button class="icon-button" aria-label="Sửa địa điểm" :disabled="state.busy" @click="editingLocation = true"><Pencil :size="16" /></button>
+        </div>
+      </div>
+      <button v-else class="chip soft add-location" :disabled="state.busy" @click="editingLocation = true"><MapPin :size="14" /> Thêm địa điểm</button>
+      <LocationPicker v-if="editingLocation" :location="memory" @save="saveLocation" @close="editingLocation = false" />
       <button class="chip like" :class="{ liked: memory.liked }" :disabled="state.busy" @click="react">
         <Heart :size="16" :fill="memory.liked ? 'currentColor' : 'none'" /> {{ memory.liked ? 'Đã thích' : 'Thích' }} · {{ memory.likes }}
       </button>

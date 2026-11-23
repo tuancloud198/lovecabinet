@@ -402,3 +402,38 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .replay-end { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }
 .replay-end-title { font-size: 26px; font-weight: 800; }
 .replay-end-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* Memory map (Leaflet + OpenStreetMap). `isolation` keeps Leaflet's z-indexes below sheets and the nav. */
+.map { position: relative; isolation: isolate; z-index: 0; background: var(--track); border-radius: var(--r-l); overflow: hidden; font: inherit; }
+.map .leaflet-control-attribution { font-size: 10px; background: rgba(255, 255, 255, .8); }
+.full-map { height: calc(100dvh - 150px); min-height: 320px; }
+.map-page:has(.map-filter) .full-map { height: calc(100dvh - 196px); }
+.map-filter { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; margin: 0 0 10px; padding-bottom: 2px; }
+.map-filter .chip { flex: none; }
+.map-note { font-size: 13px; margin-top: 10px; }
+.picker-map { height: 260px; }
+.mini-map { height: 140px; border-radius: var(--r-l) var(--r-l) 0 0; pointer-events: none; }
+.map-hint { font-size: 12px; margin-top: -6px; }
+
+.map-pin span { display: block; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--primary); border: 3px solid #fff; box-shadow: 0 3px 8px rgba(51, 41, 35, .35); }
+.map-marker { position: relative; }
+.map-photo { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 16px; border: 3px solid #fff; background: var(--primary-light); box-shadow: 0 4px 12px rgba(51, 41, 35, .3); overflow: hidden; font-size: 24px; }
+.map-photo img { width: 100%; height: 100%; object-fit: cover; }
+.map-marker b { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 12px; line-height: 22px; text-align: center; border: 2px solid #fff; }
+.map-cluster span { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 700; border: 3px solid #fff; box-shadow: 0 4px 12px var(--primary-glow-strong); }
+
+.location-row { display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 500; }
+.location-icon { color: var(--primary); flex: none; }
+.location-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.location-card { margin: 12px 0 4px; border: 1px solid var(--border-soft); border-radius: var(--r-l); background: var(--surface); }
+.location-card .location-row { padding: 2px 6px 2px 12px; }
+.location-open { display: block; width: 100%; }
+.add-location { margin: 10px 8px 0 0; }
+.cabinet-actions { display: flex; gap: 8px; justify-content: center; margin: 0 auto 12px; }
+.cabinet-actions .replay-chip { margin: 0; }
+
+.place-search { display: flex; gap: 8px; }
+.place-search input { flex: 1; min-width: 0; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface); font-size: 15px; }
+.place-results { display: flex; flex-direction: column; gap: 4px; }
+.place-result { display: flex; flex-direction: column; text-align: left; padding: 8px 10px; border-radius: var(--r-m); background: var(--surface); border: 1px solid var(--border-soft); }
+.place-result small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

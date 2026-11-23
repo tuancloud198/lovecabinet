@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
-import { Amphora, Camera, ImagePlus, Play, X } from 'lucide-vue-next'
+import { Amphora, Camera, ImagePlus, MapPin, Play, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { isoDate } from '@/format.js'
 import { state, navigate, run, load, toast } from '@/store.js'
@@ -9,6 +9,8 @@ import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
+import LocationPicker from '@/components/LocationPicker.vue'
+import { photoLocation, placeName } from '@/location.js'
 import { isVideoFile, uploadablePhoto } from '@/photos.js'
 
 const props = defineProps({ jarId: Number })
@@ -20,15 +22,53 @@ const current = ref(0)
 const viewing = ref(false)
 const progress = ref(null) // { done, total, part } while uploading
 
+// Where it happened. The GPS of the first photo that has one comes first; once the location is
+// set or removed by hand, picking more photos no longer changes it.
+const location = ref(null) // { latitude, longitude, place }
+const locationSource = ref('') // '' | 'photo' | 'manual'
+const readingGps = ref(false)
+const editingLocation = ref(false)
+let locateRun = 0
+async function locateFromPhotos() {
+  if (locationSource.value === 'manual') return
+  const id = ++locateRun
+  readingGps.value = true
+  for (const p of photos.value) if (!p.video && p.gps === undefined) p.gps = await photoLocation(p.file)
+  if (id !== locateRun || locationSource.value === 'manual') return
+  readingGps.value = false
+  const found = photos.value.find(p => p.gps)?.gps
+  if (!found) {
+    if (locationSource.value === 'photo') { location.value = null; locationSource.value = '' }
+    return
+  }
+  if (location.value?.latitude === found.latitude && location.value?.longitude === found.longitude) return
+  location.value = { ...found, place: '' }
+  locationSource.value = 'photo'
+  const place = await placeName(found)
+  if (location.value?.latitude === found.latitude && location.value?.longitude === found.longitude) location.value.place = place
+}
+function setLocation(value) {
+  location.value = value
+  locationSource.value = 'manual'
+  editingLocation.value = false
+  readingGps.value = false
+}
+const locationLabel = computed(() => {
+  if (location.value) return location.value.place || 'Đã ghim vị trí'
+  return readingGps.value ? 'Đang đọc vị trí từ ảnh…' : 'Chưa có địa điểm'
+})
+
 function pick(event) {
   for (const file of event.target.files) photos.value.push({ file, url: URL.createObjectURL(file), video: isVideoFile(file) })
   current.value = Math.max(0, photos.value.length - 1)
   event.target.value = ''
+  locateFromPhotos()
 }
 function drop(index) {
   URL.revokeObjectURL(photos.value[index].url)
   photos.value.splice(index, 1)
   current.value = Math.min(current.value, Math.max(0, photos.value.length - 1))
+  locateFromPhotos()
 }
 onBeforeUnmount(() => photos.value.forEach(p => URL.revokeObjectURL(p.url)))
 
@@ -46,7 +86,7 @@ function save() {
       p.token = (await upload('photos/stage/', body, part => { progress.value.part = part })).token
       progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
     }
-    await api('memories/', { method: 'POST', body: { ...form.value, staged_photos: photos.value.map(p => p.token) } })
+    await api('memories/', { method: 'POST', body: { ...form.value, ...(location.value ?? {}), staged_photos: photos.value.map(p => p.token) } })
     if (total) await new Promise(resolve => setTimeout(resolve, 700)) // let "5/5 · 100%" be seen
     photos.value.forEach(p => URL.revokeObjectURL(p.url))
     photos.value = []
@@ -103,6 +143,14 @@ function save() {
           <textarea v-model="form.story" maxlength="200" rows="3" placeholder="Một buổi cà phê thật chill cùng nhau ♡"></textarea>
           <span class="counter">{{ form.story.length }}/200</span>
         </label>
+        <div class="field"><span>Địa điểm</span>
+          <div class="location-row">
+            <MapPin :size="18" class="location-icon" />
+            <span class="location-text">{{ locationLabel }}<small v-if="locationSource === 'photo'" class="muted"> · từ ảnh</small></span>
+            <button type="button" class="chip soft" @click="editingLocation = true">{{ location ? 'Sửa' : 'Thêm' }}</button>
+            <button v-if="location" type="button" class="icon-button" aria-label="Bỏ địa điểm" @click="setLocation(null)"><X :size="16" /></button>
+          </div>
+        </div>
         <label class="field">Chọn hũ
           <select v-model="form.jar" required><option v-for="j in jars" :key="j.id" :value="j.id">{{ j.emoji }} {{ j.name }}</option></select>
         </label>
@@ -111,5 +159,6 @@ function save() {
         <UploadProgress v-if="state.busy && progress?.total" v-bind="progress" />
       </section>
     </form>
+    <LocationPicker v-if="editingLocation" :location="location" @save="setLocation" @close="editingLocation = false" />
   </div>
 </template>

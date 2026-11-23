@@ -1,5 +1,5 @@
 from datetime import timedelta
-from io import BytesIO
+from io import BytesIO, StringIO
 from unittest.mock import ANY, patch, MagicMock
 from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -222,6 +222,36 @@ class WorkflowTests(APITestCase):
         response = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('IMG_2516.jpeg', data.getvalue(), content_type='image/jpeg')}, format='multipart')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Photo.objects.get(pk=response.data['id']).content_type, 'image/jpeg')
+    def test_memory_location_set_validated_and_cleared(self):
+        memory = self.setup_memory()
+        url = f'/api/memories/{memory.pk}/'
+        response = self.client.patch(url, {'latitude': 11.940419, 'longitude': 108.458313, 'place': 'Hồ Xuân Hương, Đà Lạt'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.data['latitude'], response.data['place']), (11.940419, 'Hồ Xuân Hương, Đà Lạt'))
+        self.assertEqual(self.client.patch(url, {'latitude': 91}, format='json').status_code, 400)  # out of range
+        self.assertEqual(self.client.patch(url, {'longitude': None}, format='json').status_code, 400)  # half a pair
+        self.auth(self.bob)  # the partner can move or clear the pin too
+        response = self.client.patch(url, {'latitude': None, 'longitude': None}, format='json')
+        self.assertEqual((response.status_code, response.data['latitude'], response.data['place']), (200, None, ''))
+    @patch('memories.management.commands.backfill_locations.storage')
+    def test_backfill_locations_from_photo_exif(self, storage):
+        from django.core.management import call_command
+        memory = self.setup_memory()
+        def jpeg(gps=None):
+            exif = Image.Exif()
+            if gps:
+                exif.get_ifd(0x8825).update(gps)
+            data = BytesIO()
+            Image.new('RGB', (8, 8)).save(data, format='JPEG', exif=exif)
+            return data.getvalue()
+        Photo.objects.create(memory=memory, object_key='a.jpg', content_type='image/jpeg')  # no GPS: next photo is used
+        Photo.objects.create(memory=memory, object_key='b.jpg', content_type='image/jpeg')
+        files = {'a.jpg': jpeg(), 'b.jpg': jpeg({1: 'N', 2: (11.0, 56.0, 25.5), 3: 'E', 4: (108.0, 27.0, 29.9)})}
+        storage.return_value.get_object.side_effect = lambda Key, **kw: {'Body': BytesIO(files[Key])}
+        call_command('backfill_locations', stdout=StringIO())
+        memory.refresh_from_db()
+        self.assertAlmostEqual(memory.latitude, 11.940417, places=5)
+        self.assertAlmostEqual(memory.longitude, 108.458306, places=5)
     @patch('photos.services.storage')
     def test_memory_created_only_with_all_staged_photos(self, storage):
         self.pair()
