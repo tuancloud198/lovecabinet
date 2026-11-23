@@ -45,7 +45,7 @@ class PhotoSerializer(serializers.ModelSerializer):
         return stream_url(obj) if obj.content_type.startswith('video/') else None
     class Meta:
         model = Photo
-        fields = ['id', 'memory', 'url', 'kind', 'stream_url']
+        fields = ['id', 'memory', 'url', 'kind', 'stream_url', 'latitude', 'longitude', 'place']
 
 def heif_to_jpeg(upload):
     """Most browsers can't display HEIC/HEIF, so store those photos as JPEG instead."""
@@ -60,6 +60,23 @@ def heif_to_jpeg(upload):
 
 class StageSerializer(serializers.Serializer):
     file = serializers.FileField()
+    # Where it was taken: the browser reads the GPS before re-encoding (which drops it); without it
+    # the server reads the photo's own EXIF.
+    latitude = serializers.FloatField(min_value=-90, max_value=90, required=False, allow_null=True)
+    longitude = serializers.FloatField(min_value=-180, max_value=180, required=False, allow_null=True)
+    place = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    def validate(self, attrs):
+        lat, lon = attrs.get('latitude'), attrs.get('longitude')
+        if (lat is None) != (lon is None):
+            raise serializers.ValidationError('Vị trí cần cả vĩ độ và kinh độ.')
+        if lat is None:
+            attrs['latitude'], attrs['longitude'] = getattr(attrs['file'], 'gps', None) or (None, None)
+        if attrs['latitude'] is None:
+            attrs['place'] = ''
+        return attrs
+    def location(self):
+        data = self.validated_data
+        return {'latitude': data['latitude'], 'longitude': data['longitude'], 'place': data.get('place', '')}
     def validate_file(self, upload):
         header = upload.read(32)  # file signature: picks video vs image, logged when rejected
         upload.seek(0)
@@ -75,11 +92,17 @@ class StageSerializer(serializers.Serializer):
             with warnings.catch_warnings():
                 warnings.simplefilter('error', Image.DecompressionBombWarning)
                 image = Image.open(upload)
-                image.verify()
+                image.verify()  # must come right after open() and leaves the image unusable: reopen for GPS
+                upload.seek(0)
+                from photos.gps import gps_of_image
+                with Image.open(upload) as reopened:
+                    gps = gps_of_image(reopened)
+                upload.seek(0)
                 if image.format == 'HEIF':
                     upload = heif_to_jpeg(upload)
                 else:
                     upload.content_type = FORMATS[image.format]
+                upload.gps = gps
         except (UnidentifiedImageError, OSError, KeyError, ValueError, Image.DecompressionBombWarning, Image.DecompressionBombError) as error:
             logger.warning('Photo rejected: %r (name=%r, type=%r, size=%s, head=%r)', error, upload.name, upload.content_type, upload.size, header)
             raise serializers.ValidationError('Chỉ hỗ trợ ảnh JPEG, PNG, WebP, HEIC/HEIF và video MP4, MOV, WebM hợp lệ.')

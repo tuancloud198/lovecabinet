@@ -48,9 +48,9 @@ function replayDay() {
   replay.value = { memories: dayMemories.value, title: `Kỷ niệm ngày ${displayDate(day.value)}` }
   day.value = null
 }
-function replayRange(memories) {
+function replayRange(memories, only) {
   choosingRange.value = false
-  replay.value = { memories, title: 'Xem lại kỷ niệm' }
+  replay.value = { memories, only, title: 'Xem lại kỷ niệm' }
 }
 
 const adding = ref(false)
@@ -136,7 +136,7 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
     </BottomSheet>
 
     <ReplayRangeSheet v-if="choosingRange" :from="monthRange.from" :to="monthRange.to" @start="replayRange" @close="choosingRange = false" />
-    <ReplayPlayer v-if="replay" :memories="replay.memories" :title="replay.title" @close="replay = null" />
+    <ReplayPlayer v-if="replay" :memories="replay.memories" :only="replay.only" :title="replay.title" @close="replay = null" />
 
     <BottomSheet v-if="adding" title="Một ngày đặc biệt ♡" @close="adding = false">
       <form class="stack" @submit.prevent="saveEvent">

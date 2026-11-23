@@ -252,6 +252,32 @@ class WorkflowTests(APITestCase):
         memory.refresh_from_db()
         self.assertAlmostEqual(memory.latitude, 11.940417, places=5)
         self.assertAlmostEqual(memory.longitude, 108.458306, places=5)
+        self.assertAlmostEqual(Photo.objects.get(object_key='b.jpg').latitude, 11.940417, places=5)  # the photo's own spot
+        self.assertIsNone(Photo.objects.get(object_key='a.jpg').latitude)
+    @patch('photos.services.storage')
+    def test_memory_photos_keep_their_own_places(self, storage):
+        # One memory, photos from two places: the browser sends each photo's GPS (read before it
+        # re-encodes); without it the server reads the photo's own EXIF.
+        memory = self.setup_memory()
+        def jpeg(gps=None):
+            exif = Image.Exif()
+            if gps:
+                exif.get_ifd(0x8825).update(gps)
+            data = BytesIO()
+            Image.new('RGB', (8, 8)).save(data, format='JPEG', exif=exif)
+            return data.getvalue()
+        sent = self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('a.jpg', jpeg(), content_type='image/jpeg'), 'latitude': 11.94, 'longitude': 108.45, 'place': 'Đà Lạt'}, format='multipart')
+        exif = self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('b.jpg', jpeg({1: 'N', 2: (21.0, 1.0, 43.0), 3: 'E', 4: (105.0, 51.0, 8.0)}), content_type='image/jpeg')}, format='multipart')
+        none = self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('c.jpg', jpeg(), content_type='image/jpeg')}, format='multipart')
+        self.assertEqual(self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('d.jpg', jpeg(), content_type='image/jpeg'), 'latitude': 10}, format='multipart').status_code, 400)
+        response = self.client.post('/api/memories/', {'jar': memory.jar_id, 'title': 'Xuyên Việt', 'date': '2026-11-20', 'staged_photos': [sent.data['token'], exif.data['token'], none.data['token']]}, format='json')
+        self.assertEqual(response.status_code, 201)
+        places = [(p['latitude'], p['longitude'], p['place']) for p in sorted(response.data['photos'], key=lambda p: p['id'])]
+        self.assertEqual(places[0], (11.94, 108.45, 'Đà Lạt'))
+        self.assertEqual((places[1][0], round(places[1][1], 4)), (21.028611, 105.8522))
+        self.assertEqual(places[2], (None, None, ''))
+        added = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('e.jpg', jpeg(), content_type='image/jpeg'), 'latitude': 16.05, 'longitude': 108.2, 'place': 'Đà Nẵng'}, format='multipart')
+        self.assertEqual((added.status_code, added.data['place']), (201, 'Đà Nẵng'))
     @patch('photos.services.storage')
     def test_memory_created_only_with_all_staged_photos(self, storage):
         self.pair()

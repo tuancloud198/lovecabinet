@@ -10,7 +10,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
 import LocationPicker from '@/components/LocationPicker.vue'
-import { photoLocation, placeName } from '@/location.js'
+import { appendLocation, namePlaces, photoLocation, placeName } from '@/location.js'
 import { isVideoFile, uploadablePhoto } from '@/photos.js'
 
 const props = defineProps({ jarId: Number })
@@ -79,10 +79,15 @@ function save() {
   run(async () => {
     const total = photos.value.length
     progress.value = { done: photos.value.filter(p => p.token).length, total, part: 0 }
-    for (const p of photos.value) {
+    // Each photo keeps its own GPS (a memory can span several places), read before uploadablePhoto()
+    // re-encodes and drops it, and named once per area.
+    for (const p of photos.value) if (!p.video && p.gps === undefined) p.gps = await photoLocation(p.file)
+    const places = await namePlaces(photos.value.map(p => (p.token ? null : p.gps || null)), location.value)
+    for (const [i, p] of photos.value.entries()) {
       if (p.token) continue
       const body = new FormData()
       body.append('file', await uploadablePhoto(p.file))
+      appendLocation(body, p.gps, places[i])
       p.token = (await upload('photos/stage/', body, part => { progress.value.part = part })).token
       progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
     }

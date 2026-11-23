@@ -1,6 +1,7 @@
 <script setup>
 // Pick what to replay: a date range (quick presets or custom from/to dates) and optionally one place
-// (memories pinned within NEAR_KM of each other). Emits `start` with the matching memories.
+// (photos/videos taken within NEAR_KM of each other). Emits `start` with the matching memories and,
+// for a place, the ids of the photos/videos taken there (the replay shows only those).
 import { ref, computed } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { isoDate } from '@/format.js'
@@ -27,17 +28,15 @@ const range = ref({ from: props.from || first.value, to: props.to || last.value 
 const valid = computed(() => range.value.from && range.value.to && range.value.from <= range.value.to)
 const places = computed(() => placeGroups(state.memories))
 const place = ref('') // a place group's key; '' = everywhere
-const inPlace = computed(() => {
-  const group = places.value.find(g => g.key === place.value)
-  return group ? new Set(group.memories.map(m => m.id)) : null
-})
+const group = computed(() => places.value.find(g => g.key === place.value) || null)
+const inPlace = computed(() => (group.value ? new Set(group.value.memories.map(m => m.id)) : null))
 const selected = computed(() => (valid.value ? state.memories.filter(m => m.date >= range.value.from && m.date <= range.value.to && (!inPlace.value || inPlace.value.has(m.id))) : []))
 const isPreset = p => p.from === range.value.from && p.to === range.value.to
 </script>
 
 <template>
   <BottomSheet title="Xem lại kỷ niệm ♡" @close="emit('close')">
-    <form class="stack" @submit.prevent="emit('start', selected)">
+    <form class="stack" @submit.prevent="emit('start', selected, group?.only ?? null)">
       <div class="chips replay-presets">
         <button v-for="p in presets" :key="p.label" type="button" class="chip" :class="isPreset(p) ? 'chosen' : 'soft'" @click="range = { from: p.from, to: p.to }">{{ p.label }}</button>
       </div>

@@ -53,7 +53,11 @@ function shortName(result) {
   return [...new Set([name, area].filter(Boolean))].join(', ').slice(0, 120) || (result.display_name || '').split(',').slice(0, 2).join(',').trim()
 }
 
+let lastRequest = 0
 async function nominatim(path, params) {
+  const wait = lastRequest + 1100 - Date.now() // usage policy: at most 1 request per second
+  lastRequest = Date.now() + Math.max(0, wait)
+  if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
   const query = new URLSearchParams({ format: 'jsonv2', 'accept-language': 'vi', ...params })
   const response = await fetch(`${NOMINATIM}/${path}?${query}`, { signal: AbortSignal.timeout(10000) })
   if (!response.ok) throw new Error(String(response.status))
@@ -86,21 +90,79 @@ export function distanceKm(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2
   return 6371 * 2 * Math.asin(Math.sqrt(h))
 }
-/** The most used place name among memories; a tie goes to the oldest memory's ('' if none has one). */
-export function placeLabel(memories) {
+/** Every place where a memory has something: one point per photo/video, at its own GPS or else at the
+ * memory's pin; a memory without media is one point at its pin. A memory can be at several places.
+ * [{ memory, item (photo/video or null), latitude, longitude, place }] */
+export function mediaPoints(memories) {
+  const points = []
+  for (const memory of memories) {
+    const pinned = hasLocation(memory)
+    const media = memory.photos ?? []
+    if (!media.length && pinned) points.push({ memory, item: null, latitude: memory.latitude, longitude: memory.longitude, place: memory.place })
+    for (const item of media) {
+      if (hasLocation(item)) {
+        // The memory's own place name (often edited by hand) wins when the photo is near its pin.
+        const near = pinned && memory.place && distanceKm(item, memory) <= NEAR_KM
+        points.push({ memory, item, latitude: item.latitude, longitude: item.longitude, place: near ? memory.place : item.place })
+      } else if (pinned) {
+        points.push({ memory, item, latitude: memory.latitude, longitude: memory.longitude, place: memory.place })
+      }
+    }
+  }
+  return points
+}
+
+const chronological = (a, b) => a.memory.date.localeCompare(b.memory.date) || a.memory.id - b.memory.id || (a.item?.id ?? 0) - (b.item?.id ?? 0)
+/** The most used place name among points; a tie goes to the oldest one ('' if none has a name). */
+export function placeLabel(points) {
   const counts = new Map() // insertion order = oldest first, and sort() is stable
-  for (const m of [...memories].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) if (m.place) counts.set(m.place, (counts.get(m.place) || 0) + 1)
+  for (const p of [...points].sort(chronological)) if (p.place) counts.set(p.place, (counts.get(p.place) || 0) + 1)
   return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || ''
 }
-/** Pinned memories grouped by place (each within NEAR_KM of the group's first memory), biggest first:
- * [{ key, label, latitude, longitude, memories }]. */
+
+/** What to show/replay for some points: the memories (newest first), the photo/video ids taken there
+ * (`only`; a replay shows just those) and how many items each memory has there. */
+export function summarize(points) {
+  const memories = [...new Map(points.map(p => [p.memory.id, p.memory])).values()].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+  const only = new Set(points.filter(p => p.item).map(p => p.item.id))
+  const itemsHere = Object.fromEntries(memories.map(m => [m.id, points.filter(p => p.memory.id === m.id && p.item).length]))
+  return { label: placeLabel(points) || 'Địa điểm chưa đặt tên', memories, only, itemsHere }
+}
+
+/** Places across memories: points within NEAR_KM of a group's first point, biggest first:
+ * [{ key, latitude, longitude, points, label, memories, only, itemsHere }]. */
 export function placeGroups(memories) {
   const groups = []
-  for (const m of memories.filter(hasLocation).sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
-    const group = groups.find(g => distanceKm(g, m) <= NEAR_KM)
-    if (group) group.memories.push(m)
-    else groups.push({ key: `${m.latitude},${m.longitude}`, latitude: m.latitude, longitude: m.longitude, memories: [m] })
+  for (const point of mediaPoints(memories).sort(chronological)) {
+    const group = groups.find(g => distanceKm(g, point) <= NEAR_KM)
+    if (group) group.points.push(point)
+    else groups.push({ key: `${point.latitude},${point.longitude}`, latitude: point.latitude, longitude: point.longitude, points: [point] })
   }
-  for (const g of groups) g.label = placeLabel(g.memories) || 'Địa điểm chưa đặt tên'
-  return groups.sort((a, b) => b.memories.length - a.memories.length || a.label.localeCompare(b.label))
+  return groups.map(g => ({ ...g, ...summarize(g.points) })).sort((a, b) => b.memories.length - a.memories.length || b.points.length - a.points.length || a.label.localeCompare(b.label))
+}
+
+/** Place names for photo locations (null = none), one lookup per NEAR_KM area. A location near the
+ * memory's pin takes the memory's place name. */
+export async function namePlaces(locations, memoryLocation) {
+  const named = []
+  const names = []
+  for (const location of locations) {
+    if (!location) { names.push(''); continue }
+    let hit = named.find(n => distanceKm(n, location) <= NEAR_KM)
+    if (!hit) {
+      const nearPin = hasLocation(memoryLocation) && memoryLocation.place && distanceKm(memoryLocation, location) <= NEAR_KM
+      hit = { ...location, place: nearPin ? memoryLocation.place : await placeName(location) }
+      named.push(hit)
+    }
+    names.push(hit.place)
+  }
+  return names
+}
+
+/** Form fields for an upload's location. */
+export function appendLocation(body, location, place) {
+  if (!location) return
+  body.append('latitude', location.latitude)
+  body.append('longitude', location.longitude)
+  body.append('place', (place || '').slice(0, 120))
 }

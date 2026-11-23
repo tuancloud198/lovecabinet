@@ -48,9 +48,9 @@ function openNotifications() {
 // Replay memories from a date range (defaults to all of them).
 const choosingRange = ref(false)
 const replaying = ref(null)
-function replayRange(memories) {
+function replayRange(memories, only) {
   choosingRange.value = false
-  replaying.value = memories
+  replaying.value = { memories, only }
 }
 
 const addingJar = ref(false)
@@ -89,7 +89,7 @@ function saveJar() {
     </div>
     <OnThisDay />
     <ReplayRangeSheet v-if="choosingRange" @start="replayRange" @close="choosingRange = false" />
-    <ReplayPlayer v-if="replaying" :memories="replaying" @close="replaying = null" />
+    <ReplayPlayer v-if="replaying" :memories="replaying.memories" :only="replaying.only" @close="replaying = null" />
 
     <div class="cabinet">
       <div v-if="!jars.length" class="cabinet-empty">

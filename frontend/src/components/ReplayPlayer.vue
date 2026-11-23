@@ -11,14 +11,25 @@ import { state } from '@/store.js'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
 
-const props = defineProps({ memories: { type: Array, required: true }, title: { type: String, default: 'Xem lại kỷ niệm' } })
+const props = defineProps({
+  memories: { type: Array, required: true },
+  title: { type: String, default: 'Xem lại kỷ niệm' },
+  only: { type: Set, default: null }, // photo/video ids to show (replay at a place); null = everything
+})
 const emit = defineEmits(['close'])
 const PHOTO_MS = 5000
 const CARD_MS = 4000 // a memory without photos or videos
 
-const ordered = computed(() => [...props.memories].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id))
-const slides = computed(() => ordered.value.flatMap((memory, m) => {
+// With `only`, a memory shows just those items (and is skipped if none of its items are there).
+const shown = memory => {
   const media = mediaOf(memory)
+  return props.only && media.length ? media.filter(item => props.only.has(item.id)) : media
+}
+const ordered = computed(() => [...props.memories]
+  .filter(memory => !props.only || !mediaOf(memory).length || shown(memory).length)
+  .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id))
+const slides = computed(() => ordered.value.flatMap((memory, m) => {
+  const media = shown(memory)
   return media.length ? media.map((item, i) => ({ memory, item, m, i, n: media.length })) : [{ memory, item: null, m, i: 0, n: 1 }]
 }))
 const index = ref(0)

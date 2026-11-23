@@ -1,34 +1,15 @@
-import io
 import json
 import time
 import urllib.parse
 import urllib.request
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from PIL import Image
 from memories.models import Memory
+from photos.gps import gps_from_bytes
+from photos.models import Photo
 from photos.services import storage
 
-GPS_IFD = 0x8825
 HEAD_BYTES = 256 * 1024  # EXIF sits at the start of a JPEG
-
-
-def to_degrees(value, ref):
-    degrees, minutes, seconds = (float(v) for v in value)
-    result = degrees + minutes / 60 + seconds / 3600
-    return -result if ref in ('S', 'W') else result
-
-
-def gps_from_jpeg(data):
-    """(latitude, longitude) from a photo's EXIF, or None."""
-    try:
-        gps = Image.open(io.BytesIO(data)).getexif().get_ifd(GPS_IFD)
-        lat, lon = to_degrees(gps[2], gps.get(1, 'N')), to_degrees(gps[4], gps.get(3, 'E'))
-    except Exception:  # no/partial EXIF, not an image
-        return None
-    if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
-        return None
-    return round(lat, 6), round(lon, 6)
 
 
 def place_name(lat, lon):
@@ -47,32 +28,47 @@ def place_name(lat, lon):
 
 
 class Command(BaseCommand):
-    help = "Pin memories that have no location yet using the GPS in their photos' EXIF."
+    help = ("Read the GPS of photos that have no location yet from their EXIF (in S3), and pin memories "
+            "without a location at their first photo with GPS.")
 
     def add_arguments(self, parser):
-        parser.add_argument('--geocode', action='store_true', help='also look up place names (OpenStreetMap Nominatim, 1 request/s)')
+        parser.add_argument('--geocode', action='store_true', help='also look up place names (OpenStreetMap Nominatim, 1 request/s, one per ~100 m spot)')
         parser.add_argument('--dry-run', action='store_true')
 
     def handle(self, *args, geocode=False, dry_run=False, **options):
         client = storage()
-        pinned = 0
-        memories = Memory.objects.filter(latitude__isnull=True).prefetch_related('photos').order_by('id')
-        for memory in memories:
-            for photo in sorted(memory.photos.all(), key=lambda p: p.id):  # first photo with GPS wins, like the app
-                if not photo.content_type.startswith('image/'):
-                    continue
-                data = client.get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key, Range=f'bytes=0-{HEAD_BYTES - 1}')['Body'].read()
-                coords = gps_from_jpeg(data)
-                if coords:
-                    break
-            else:
-                continue
-            memory.latitude, memory.longitude = coords
-            if geocode:
-                memory.place = place_name(*coords)
+        names = {}  # ~100 m spot -> name, so nearby photos share one lookup
+
+        def name_for(lat, lon):
+            if not geocode:
+                return ''
+            spot = (round(lat, 3), round(lon, 3))
+            if spot not in names:
+                names[spot] = place_name(lat, lon)
                 time.sleep(1.1)  # Nominatim usage policy: at most 1 request per second
+            return names[spot]
+
+        located = 0
+        for photo in Photo.objects.filter(latitude__isnull=True, content_type__startswith='image/').order_by('id'):
+            data = client.get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key, Range=f'bytes=0-{HEAD_BYTES - 1}')['Body'].read()
+            coords = gps_from_bytes(data)
+            if not coords:
+                continue
+            photo.latitude, photo.longitude = coords
+            photo.place = name_for(*coords)
+            located += 1
+            self.stdout.write(f'photo {photo.pk} (memory {photo.memory_id}): located' + (f' ({photo.place})' if photo.place else ''))
+            if not dry_run:
+                photo.save(update_fields=['latitude', 'longitude', 'place'])
+
+        pinned = 0
+        for memory in Memory.objects.filter(latitude__isnull=True).prefetch_related('photos').order_by('id'):
+            first = next((p for p in sorted(memory.photos.all(), key=lambda p: p.id) if p.latitude is not None), None)
+            if not first:
+                continue
+            memory.latitude, memory.longitude, memory.place = first.latitude, first.longitude, first.place or name_for(first.latitude, first.longitude)
             pinned += 1
-            self.stdout.write(f'memory {memory.pk}: pinned from photo {photo.pk}' + (f' ({memory.place})' if memory.place else ''))
+            self.stdout.write(f'memory {memory.pk}: pinned from photo {first.pk}' + (f' ({memory.place})' if memory.place else ''))
             if not dry_run:
                 memory.save(update_fields=['latitude', 'longitude', 'place'])
-        self.stdout.write(self.style.SUCCESS(f'{pinned} memories pinned' + (' (dry run, nothing saved)' if dry_run else '')))
+        self.stdout.write(self.style.SUCCESS(f'{located} photos located, {pinned} memories pinned' + (' (dry run, nothing saved)' if dry_run else '')))

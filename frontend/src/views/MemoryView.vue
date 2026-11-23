@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { Camera, Heart, ImagePlus, MapPin, Pencil, Play, Send, Trash2, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
-import { firstPhotoLocation, hasLocation, placeName } from '@/location.js'
+import { appendLocation, hasLocation, namePlaces, photoLocation, placeGroups } from '@/location.js'
 import { forgetPhoto, isVideo, mediaOf, uploadablePhoto } from '@/photos.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
@@ -28,6 +28,8 @@ const comment = ref('')
 const member = id => state.couple.members.find(m => m.id === id)
 const back = () => navigate('jar', { id: memory.value?.jar })
 const editingLocation = ref(false)
+// Every place this memory's photos/videos were taken (or its pin).
+const places = computed(() => placeGroups(memory.value ? [memory.value] : []))
 
 const pinTo = location => api(`memories/${props.id}/`, { method: 'PATCH', body: location ?? { latitude: null, longitude: null } })
 function saveLocation(location) {
@@ -54,19 +56,24 @@ function addPhotos(event) {
   event.target.value = ''
   if (!files.length) return
   run(async () => {
-    // A memory without a location takes the GPS of the first new photo that has one (read before
-    // uploadablePhoto() re-encodes and drops the metadata).
-    const gps = hasLocation(memory.value) ? null : await firstPhotoLocation(files)
+    // Each photo keeps its own GPS (read before uploadablePhoto() re-encodes and drops it). A memory
+    // without a pin is pinned at the first new photo that has one.
+    const located = []
+    for (const file of files) located.push(await photoLocation(file))
+    const places = await namePlaces(located, hasLocation(memory.value) ? memory.value : null)
+    const first = located.findIndex(Boolean)
+    const gps = hasLocation(memory.value) || first < 0 ? null : { ...located[first], place: places[first] }
     progress.value = { done: 0, total: files.length, part: 0 }
     try {
-      for (const file of files) {
+      for (const [i, file] of files.entries()) {
         const body = new FormData()
         body.append('memory', props.id)
         body.append('file', await uploadablePhoto(file))
+        appendLocation(body, located[i], places[i])
         await upload('photos/', body, part => { progress.value.part = part })
         progress.value = { ...progress.value, done: progress.value.done + 1, part: 0 }
       }
-      if (gps) await pinTo({ ...gps, place: await placeName(gps) })
+      if (gps) await pinTo(gps)
       await new Promise(resolve => setTimeout(resolve, 700)) // let "5/5 · 100%" be seen
     } finally {
       await load() // show whatever was uploaded, even if a later photo failed
@@ -128,13 +135,13 @@ function remove() {
       <h2 class="memory-title">{{ memory.emoji }} {{ memory.title }}</h2>
       <p class="muted">{{ memory.author_name }} · {{ timeAgo(memory.created_at) }}</p>
       <p v-if="memory.story" class="story">{{ memory.story }}</p>
-      <div v-if="hasLocation(memory)" class="location-card">
+      <div v-if="places.length" class="location-card">
         <button type="button" class="location-open" aria-label="Xem trên bản đồ" @click="navigate('map', { focus: memory.id })">
-          <MiniMap :latitude="memory.latitude" :longitude="memory.longitude" />
+          <MiniMap :points="places.map(g => ({ latitude: g.latitude, longitude: g.longitude }))" />
         </button>
         <div class="location-row">
           <MapPin :size="18" class="location-icon" />
-          <span class="location-text">{{ memory.place || 'Đã ghim vị trí' }}</span>
+          <span class="location-text">{{ places.map(g => g.label).join(' · ') }}<small v-if="places.length > 1" class="muted"> ({{ places.length }} nơi)</small></span>
           <button class="icon-button" aria-label="Sửa địa điểm" :disabled="state.busy" @click="editingLocation = true"><Pencil :size="16" /></button>
         </div>
       </div>

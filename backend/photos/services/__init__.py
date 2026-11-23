@@ -20,13 +20,15 @@ def object_key(memory, content_type):
     """{jar id}/{memory id}/{random}.{ext}: grouped per jar and memory; the random name lets a memory hold many photos."""
     return f'{memory.jar_id}/{memory.pk}/{uuid.uuid4().hex}.{EXTENSIONS[content_type]}'
 
-def upload_photo(user, memory_id, upload):
+NO_LOCATION = {'latitude': None, 'longitude': None, 'place': ''}
+
+def upload_photo(user, memory_id, upload, location=NO_LOCATION):
     memory = get_object_or_404(Memory, pk=memory_id, jar__cabinet__couple=couple_for(user))
     key = object_key(memory, upload.content_type)
     client = storage()
     client.upload_fileobj(upload, settings.MINIO_BUCKET, key, ExtraArgs={'ContentType': upload.content_type})
     try:
-        return Photo.objects.create(memory=memory, object_key=key, content_type=upload.content_type)
+        return Photo.objects.create(memory=memory, object_key=key, content_type=upload.content_type, **location)
     except Exception:
         client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
         raise
@@ -34,13 +36,13 @@ def upload_photo(user, memory_id, upload):
 STAGE_SALT = 'photos.stage'
 STAGE_MAX_AGE = 24 * 3600
 
-def stage_photo(user, upload):
+def stage_photo(user, upload, location=NO_LOCATION):
     """Upload a photo before its memory exists (so a memory is only created once all its
     photos are uploaded). Returns a signed token naming the staged object."""
     couple_for(user)
     key = f'staging/{user.pk}/{uuid.uuid4().hex}.{EXTENSIONS[upload.content_type]}'
     storage().upload_fileobj(upload, settings.MINIO_BUCKET, key, ExtraArgs={'ContentType': upload.content_type})
-    return signing.dumps({'key': key, 'type': upload.content_type, 'user': user.pk}, salt=STAGE_SALT)
+    return signing.dumps({'key': key, 'type': upload.content_type, 'user': user.pk, 'location': location}, salt=STAGE_SALT)
 
 def read_staged(token, user):
     try:
@@ -61,7 +63,7 @@ def attach_staged(memory, staged):
             key = object_key(memory, item['type'])
             client.copy_object(Bucket=settings.MINIO_BUCKET, Key=key, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': item['key']})
             copied.append(key)
-            Photo.objects.create(memory=memory, object_key=key, content_type=item['type'])
+            Photo.objects.create(memory=memory, object_key=key, content_type=item['type'], **(item.get('location') or NO_LOCATION))
     except Exception:
         for key in copied:
             client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
