@@ -338,6 +338,16 @@ class WorkflowTests(APITestCase):
         video_id = Photo.objects.filter(content_type__startswith='video/').first().pk
         self.assertEqual(self.client.delete(f'/api/photos/{video_id}/').status_code, 204)
         self.assertFalse(Photo.objects.filter(pk=video_id).exists())
+    def test_couple_dates_validated(self):
+        self.pair()
+        url = f"/api/couples/{Membership.objects.get(user=self.bob).couple_id}/"
+        response = self.client.patch(url, {'met_on': '2023-11-23', 'dating_since': '2024-02-14'}, format='json')
+        self.assertEqual((response.status_code, response.data['met_on'], response.data['dating_since']), (200, '2023-11-23', '2024-02-14'))
+        self.assertEqual(self.client.patch(url, {'dating_since': '2023-01-01'}, format='json').status_code, 400)  # before meeting
+        future = (timezone.localdate() + timedelta(days=1)).isoformat()
+        self.assertEqual(self.client.patch(url, {'met_on': future}, format='json').status_code, 400)
+        self.auth(self.alice)  # either partner can change them
+        self.assertEqual(self.client.patch(url, {'met_on': None}, format='json').data['met_on'], None)
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

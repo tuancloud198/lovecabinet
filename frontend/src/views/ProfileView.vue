@@ -1,12 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { LogOut, Pencil } from 'lucide-vue-next'
+import { daysTogether } from '@/anniversaries.js'
 import { api } from '@/api.js'
 import { displayDate } from '@/format.js'
 import { state, partner, run, signOut, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
+import CoupleDatesSheet from '@/components/CoupleDatesSheet.vue'
 import UserTag from '@/components/UserTag.vue'
 
 // Release check: both versions are the image tags, so after a deploy you can see it went live.
@@ -14,6 +16,7 @@ const frontendVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 const backendVersion = ref('…')
 onMounted(() => api('auth/config/').then(data => { backendVersion.value = data.version || 'dev' }).catch(() => { backendVersion.value = '?' }))
 const editing = ref(false)
+const editingDates = ref(false)
 const form = ref({})
 function startEdit() {
   const { display_name, gender, birth_date, bio } = state.me
@@ -54,7 +57,13 @@ function save() {
         <CharacterAvatar :user="partner" mood="happy" :size="56" />
         <div><strong>{{ partner.display_name }}</strong><small class="muted">{{ partner.tag }}</small></div>
       </div>
+      <div class="couple-dates">
+        <span>👋 Gặp nhau: <strong>{{ state.couple.met_on ? displayDate(state.couple.met_on) : '—' }}</strong></span>
+        <span>💘 Yêu nhau: <strong>{{ state.couple.dating_since ? displayDate(state.couple.dating_since) : '—' }}</strong></span>
+        <button class="icon-button" aria-label="Sửa ngày của chúng mình" @click="editingDates = true"><Pencil :size="16" /></button>
+      </div>
       <div class="stats">
+        <div v-if="daysTogether(state.couple)"><strong>{{ daysTogether(state.couple) }}</strong><small>ngày bên nhau</small></div>
         <div><strong>{{ state.memories.length }}</strong><small>kỷ niệm</small></div>
         <div><strong>{{ state.jars.length }}</strong><small>hũ</small></div>
         <div><strong>{{ state.events.length }}</strong><small>sự kiện</small></div>
@@ -63,6 +72,7 @@ function save() {
     <button class="btn outline block" :disabled="state.busy" @click="signOut"><LogOut :size="18" /> Đăng xuất</button>
     <p class="app-version">Phiên bản giao diện {{ frontendVersion }} · máy chủ {{ backendVersion }}</p>
 
+    <CoupleDatesSheet v-if="editingDates" @close="editingDates = false" />
     <BottomSheet v-if="editing" title="Hồ sơ của bạn ♡" @close="editing = false">
       <form class="stack" @submit.prevent="save">
         <label class="field">Tên hiển thị<input v-model="form.display_name" required maxlength="100" /></label>

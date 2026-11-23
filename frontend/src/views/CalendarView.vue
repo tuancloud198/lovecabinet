@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { CalendarPlus, ChevronLeft, ChevronRight, Play, Plus, X } from 'lucide-vue-next'
 import { api } from '@/api.js'
+import { anniversaries, upcomingAnniversaries } from '@/anniversaries.js'
 import { daysUntil, displayDate, isoDate, shortDate } from '@/format.js'
 import { state, navigate, run, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
@@ -17,19 +18,26 @@ const today = isoDate()
 const month = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 const eventsByDay = computed(() => state.events.reduce((byDay, e) => ((byDay[e.date] ||= []).push(e), byDay), {}))
 const memoriesByDay = computed(() => state.memories.reduce((byDay, m) => ((byDay[m.date] ||= []).push(m), byDay), {}))
+// Our anniversaries (from the couple's dates) shown like events, but not deletable.
+const monthEnd = computed(() => isoDate(new Date(month.value.getFullYear(), month.value.getMonth() + 1, 0)))
+const annivByDay = computed(() => anniversaries(state.couple, isoDate(month.value), monthEnd.value).reduce((byDay, a) => ((byDay[a.date] ||= []).push(a), byDay), {}))
 const cells = computed(() => {
   const first = month.value
   const offset = (first.getDay() + 6) % 7 // Monday-first
   const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
   return [...Array(offset).fill(null), ...Array.from({ length: days }, (_, i) => isoDate(new Date(first.getFullYear(), first.getMonth(), i + 1)))]
 })
-const upcoming = computed(() => state.events.filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)))
+const upcoming = computed(() => [
+  ...state.events.filter(e => e.date >= today),
+  ...upcomingAnniversaries(state.couple).slice(0, 3).map(a => ({ ...a, anniversary: true })),
+].sort((a, b) => a.date.localeCompare(b.date)))
 const shift = n => { month.value = new Date(month.value.getFullYear(), month.value.getMonth() + n, 1) }
 
 // Tapping a day shows its memories (each opens the memory) and events.
 const day = ref(null)
 const dayMemories = computed(() => (memoriesByDay.value[day.value] || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)))
 const dayEvents = computed(() => eventsByDay.value[day.value] || [])
+const dayAnniversaries = computed(() => anniversaries(state.couple, day.value, day.value))
 
 // Replay: a single day (from its sheet) or a date range (defaults to the month shown).
 const replay = ref(null) // { memories, title }
@@ -82,9 +90,10 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
         <span v-for="w in WEEKDAYS" :key="w" class="weekday" :class="{ sunday: w === 'CN' }">{{ w }}</span>
         <template v-for="(d, i) in cells" :key="i">
           <span v-if="!d"></span>
-          <button v-else class="day" :class="{ today: d === today, event: eventsByDay[d], sunday: i % 7 === 6 }" :aria-label="`Ngày ${Number(d.slice(8))}${eventsByDay[d] ? ', có sự kiện' : ''}${memoriesByDay[d] ? `, ${memoriesByDay[d].length} kỷ niệm` : ''}`" @click="day = d">
+          <button v-else class="day" :class="{ today: d === today, event: eventsByDay[d] || annivByDay[d], sunday: i % 7 === 6 }" :aria-label="`Ngày ${Number(d.slice(8))}${eventsByDay[d] ? ', có sự kiện' : ''}${annivByDay[d] ? `, ${annivByDay[d][0].title}` : ''}${memoriesByDay[d] ? `, ${memoriesByDay[d].length} kỷ niệm` : ''}`" @click="day = d">
             <span class="num">{{ Number(d.slice(8)) }}</span>
-            <span v-if="eventsByDay[d]" class="day-emoji">{{ eventsByDay[d][0].emoji }}</span>
+            <span v-if="annivByDay[d]" class="day-emoji">{{ annivByDay[d][0].emoji }}</span>
+            <span v-else-if="eventsByDay[d]" class="day-emoji">{{ eventsByDay[d][0].emoji }}</span>
             <span v-else-if="memoriesByDay[d]" class="day-dot"></span>
           </button>
         </template>
@@ -95,11 +104,11 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
     <section class="sheet-section">
       <h2 class="section-title">Sự kiện sắp tới</h2>
       <p v-if="!upcoming.length" class="muted">Chưa có sự kiện sắp tới. Lên lịch một buổi hẹn nhé!</p>
-      <div v-for="e in upcoming" :key="e.id" class="event-row card">
+      <div v-for="e in upcoming" :key="e.key || e.id" class="event-row card" :class="{ anniversary: e.anniversary }">
         <span class="date-chip">{{ shortDate(e.date) }}</span>
         <span class="row-text"><strong>{{ e.title }} {{ e.emoji }}</strong></span>
         <span class="chip green">{{ countdown(e.date) }}</span>
-        <button class="icon-button" :aria-label="`Xóa ${e.title}`" @click="removeEvent(e)"><X :size="16" /></button>
+        <button v-if="!e.anniversary" class="icon-button" :aria-label="`Xóa ${e.title}`" @click="removeEvent(e)"><X :size="16" /></button>
       </div>
     </section>
 
@@ -107,6 +116,7 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
 
     <BottomSheet v-if="day" :title="displayDate(day)" @close="day = null">
       <div class="stack">
+        <div v-for="a in dayAnniversaries" :key="a.key" class="event-row card anniversary"><span class="row-text"><strong>{{ a.title }} {{ a.emoji }}</strong></span></div>
         <div v-for="e in dayEvents" :key="e.id" class="event-row card">
           <span class="row-text"><strong>{{ e.title }} {{ e.emoji }}</strong></span>
           <button class="icon-button" :aria-label="`Xóa ${e.title}`" @click="removeEvent(e)"><X :size="16" /></button>

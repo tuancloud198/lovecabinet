@@ -10,6 +10,7 @@ import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
+import LoveCounter from '@/components/LoveCounter.vue'
 import OnThisDay from '@/components/OnThisDay.vue'
 import ReplayPlayer from '@/components/ReplayPlayer.vue'
 import ReplayRangeSheet from '@/components/ReplayRangeSheet.vue'
@@ -81,6 +82,7 @@ function saveJar() {
       <CharacterAvatar :user="partner" :size="56" />
       <span class="visually-hidden">Tủ chung của {{ state.me.display_name }} và {{ partner?.display_name }}</span>
     </div>
+    <LoveCounter />
     <div v-if="state.memories.length" class="cabinet-actions">
       <button class="chip replay-chip" @click="choosingRange = true"><Play :size="14" fill="currentColor" /> Xem lại kỷ niệm</button>
       <button class="chip replay-chip" @click="navigate('map')"><MapIcon :size="14" /> Bản đồ</button>
