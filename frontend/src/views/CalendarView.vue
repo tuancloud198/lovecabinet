@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { CalendarPlus, ChevronLeft, ChevronRight, Plus, X } from 'lucide-vue-next'
+import { CalendarPlus, ChevronLeft, ChevronRight, Play, Plus, X } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { daysUntil, displayDate, isoDate, shortDate } from '@/format.js'
 import { state, navigate, run, toast } from '@/store.js'
@@ -8,6 +8,8 @@ import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
+import ReplayPlayer from '@/components/ReplayPlayer.vue'
+import ReplayRangeSheet from '@/components/ReplayRangeSheet.vue'
 import { coverPhoto } from '@/photos.js'
 
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
@@ -28,6 +30,19 @@ const shift = n => { month.value = new Date(month.value.getFullYear(), month.val
 const day = ref(null)
 const dayMemories = computed(() => (memoriesByDay.value[day.value] || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)))
 const dayEvents = computed(() => eventsByDay.value[day.value] || [])
+
+// Replay: a single day (from its sheet) or a date range (defaults to the month shown).
+const replay = ref(null) // { memories, title }
+const choosingRange = ref(false)
+const monthRange = computed(() => ({ from: isoDate(month.value), to: isoDate(new Date(month.value.getFullYear(), month.value.getMonth() + 1, 0)) }))
+function replayDay() {
+  replay.value = { memories: dayMemories.value, title: `Kỷ niệm ngày ${displayDate(day.value)}` }
+  day.value = null
+}
+function replayRange(memories) {
+  choosingRange.value = false
+  replay.value = { memories, title: 'Xem lại kỷ niệm' }
+}
 
 const adding = ref(false)
 const form = ref({})
@@ -75,6 +90,7 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
         </template>
       </div>
     </section>
+    <button v-if="state.memories.length" class="btn outline block replay-entry" @click="choosingRange = true"><Play :size="18" fill="currentColor" /> Xem lại theo khoảng ngày</button>
 
     <section class="sheet-section">
       <h2 class="section-title">Sự kiện sắp tới</h2>
@@ -103,9 +119,13 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
             <ChevronRight :size="20" />
           </button>
         </div>
+        <button v-if="dayMemories.length" class="btn primary block" @click="replayDay"><Play :size="18" fill="currentColor" /> Xem lại ngày này</button>
         <button class="btn outline block" @click="startEvent(day)"><CalendarPlus :size="18" /> Thêm sự kiện ngày này</button>
       </div>
     </BottomSheet>
+
+    <ReplayRangeSheet v-if="choosingRange" :from="monthRange.from" :to="monthRange.to" @start="replayRange" @close="choosingRange = false" />
+    <ReplayPlayer v-if="replay" :memories="replay.memories" :title="replay.title" @close="replay = null" />
 
     <BottomSheet v-if="adding" title="Một ngày đặc biệt ♡" @close="adding = false">
       <form class="stack" @submit.prevent="saveEvent">

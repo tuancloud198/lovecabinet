@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Bell, Heart, MessageCircle, Plus } from 'lucide-vue-next'
+import { Bell, Heart, MessageCircle, Play, Plus } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { timeAgo } from '@/format.js'
 import { state, partner, navigate, run, cabinetForYear, toast } from '@/store.js'
@@ -10,6 +10,8 @@ import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
+import ReplayPlayer from '@/components/ReplayPlayer.vue'
+import ReplayRangeSheet from '@/components/ReplayRangeSheet.vue'
 
 const JAR_COLORS = ['#F6C9C4', '#BFD7EA', '#F3D9A4', '#CFE3CF', '#E3D3EE']
 // A couple has one cabinet (Tủ): show every jar in it.
@@ -41,6 +43,14 @@ function openNotifications() {
   try { localStorage.setItem(SEEN_KEY, seen.value) } catch { /* optional */ }
 }
 
+// Replay memories from a date range (defaults to all of them).
+const choosingRange = ref(false)
+const replaying = ref(null)
+function replayRange(memories) {
+  choosingRange.value = false
+  replaying.value = memories
+}
+
 const addingJar = ref(false)
 const form = ref({})
 function startJar() {
@@ -70,6 +80,9 @@ function saveJar() {
       <CharacterAvatar :user="partner" :size="56" />
       <span class="visually-hidden">Tủ chung của {{ state.me.display_name }} và {{ partner?.display_name }}</span>
     </div>
+    <button v-if="state.memories.length" class="chip replay-chip" @click="choosingRange = true"><Play :size="14" fill="currentColor" /> Xem lại kỷ niệm</button>
+    <ReplayRangeSheet v-if="choosingRange" @start="replayRange" @close="choosingRange = false" />
+    <ReplayPlayer v-if="replaying" :memories="replaying" @close="replaying = null" />
 
     <div class="cabinet">
       <div v-if="!jars.length" class="cabinet-empty">
