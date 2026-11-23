@@ -1,6 +1,6 @@
 <script setup>
-import { computed } from 'vue'
-import { ChevronRight, Camera, Trash2 } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { ChevronRight, Camera, Play, Trash2 } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { displayDate } from '@/format.js'
 import { state, navigate, run, load, toast } from '@/store.js'
@@ -9,12 +9,14 @@ import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
+import ReplayPlayer from '@/components/ReplayPlayer.vue'
 import { coverPhoto } from '@/photos.js'
 
 const props = defineProps({ id: Number })
 const jar = computed(() => state.jars.find(j => j.id === props.id))
 const member = id => state.couple.members.find(m => m.id === id)
 const memories = computed(() => state.memories.filter(m => m.jar === props.id).sort((a, b) => b.date.localeCompare(a.date)))
+const replaying = ref(false) // replay every memory in this jar (oldest first)
 
 function removeJar() {
   if (!window.confirm(`Xóa hũ "${jar.value.name}" và tất cả kỷ niệm bên trong?`)) return
@@ -35,6 +37,8 @@ function removeJar() {
     <div class="jar-stage">
       <JarArt :color="jar.color" :emojis="memories.length ? memories.map(m => m.emoji) : [jar.emoji]" large />
     </div>
+    <button v-if="memories.length" class="chip replay-chip jar-replay" @click="replaying = true"><Play :size="14" fill="currentColor" /> Xem lại cả hũ</button>
+    <ReplayPlayer v-if="replaying" :memories="memories" :title="`Hũ ${jar.name}`" @close="replaying = false" />
     <section class="sheet-section">
       <div class="section-head"><h2>Các kỷ niệm trong hũ ({{ memories.length }})</h2><button class="btn small primary" @click="navigate('capture', { jarId: jar.id })"><Camera :size="16" /> Thêm</button></div>
       <EmptyState v-if="!memories.length" title="Chưa có kỷ niệm nào" text="Hãy chụp một bức ảnh để lưu giữ khoảnh khắc đầu tiên cùng nhau nhé! ♡">

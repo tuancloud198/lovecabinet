@@ -376,6 +376,7 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 
 /* Replay (Lịch / Tủ) */
 .replay-entry { margin-top: 12px; }
+.jar-replay { margin-top: 12px; }
 .replay-chip { display: flex; width: fit-content; margin: 0 auto 12px; background: var(--surface); border: 1px solid var(--primary-border); color: var(--primary); }
 .replay-presets { justify-content: flex-start; margin: 0; }
 .chip.chosen { background: var(--primary); color: #fff; }
