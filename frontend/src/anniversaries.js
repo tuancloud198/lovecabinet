@@ -49,5 +49,12 @@ export function anniversaries(couple, from, to) {
   return items.sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/** A birth date's next birthday from today: { date, age } (today counts). */
+export function nextBirthday(born, today = isoDate()) {
+  let age = Number(today.slice(0, 4)) - Number(born.slice(0, 4))
+  if (addYears(born, age) < today) age++
+  return { date: addYears(born, age), age }
+}
+
 /** Anniversaries and birthdays from today on (the next two years). */
 export const upcomingAnniversaries = (couple, today = isoDate()) => anniversaries(couple, today, addYears(today, 2))

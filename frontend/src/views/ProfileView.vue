@@ -1,10 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Camera, LogOut, Pencil } from 'lucide-vue-next'
-import { daysTogether } from '@/anniversaries.js'
+import { daysTogether, nextBirthday } from '@/anniversaries.js'
 import { api, upload } from '@/api.js'
 import { uploadablePhoto } from '@/photos.js'
-import { displayDate } from '@/format.js'
+import { daysUntil, displayDate } from '@/format.js'
 import { state, partner, run, signOut, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -17,6 +17,12 @@ const frontendVersion = import.meta.env.VITE_APP_VERSION || 'dev'
 const backendVersion = ref('…')
 onMounted(() => api('auth/config/').then(data => { backendVersion.value = data.version || 'dev' }).catch(() => { backendVersion.value = '?' }))
 const editing = ref(false)
+// "06/03/1998 · còn 102 ngày đến sinh nhật 29 tuổi" (or "hôm nay")
+function birthdayText(born) {
+  const next = nextBirthday(born)
+  const days = daysUntil(next.date)
+  return `${displayDate(born)} · ${days ? `còn ${days} ngày đến sinh nhật ${next.age} tuổi` : `hôm nay tròn ${next.age} tuổi 🎉`}`
+}
 
 // Own profile picture instead of the dog character (cropped to a square by the server).
 function applyMe(user) {
@@ -89,6 +95,11 @@ function save() {
         <CharacterAvatar :user="partner" mood="happy" :size="56" />
         <div><strong>{{ partner.display_name }}</strong><small class="muted">{{ partner.tag }}</small></div>
       </div>
+      <dl class="partner-info">
+        <div v-if="partner.gender"><dt>Giới tính</dt><dd>{{ partner.gender === 'Nam' ? 'Nam ♂' : partner.gender === 'Nữ' ? 'Nữ ♀' : partner.gender }}</dd></div>
+        <div><dt>🎂 Sinh nhật</dt><dd>{{ partner.birth_date ? birthdayText(partner.birth_date) : 'Chưa cập nhật' }}</dd></div>
+        <div><dt>Giới thiệu</dt><dd :class="{ muted: !partner.bio }">{{ partner.bio || 'Chưa có lời giới thiệu.' }}</dd></div>
+      </dl>
       <div class="couple-dates">
         <span>👋 Gặp nhau: <strong>{{ state.couple.met_on ? displayDate(state.couple.met_on) : '—' }}</strong></span>
         <span>💘 Yêu nhau: <strong>{{ state.couple.dating_since ? displayDate(state.couple.dating_since) : '—' }}</strong></span>
