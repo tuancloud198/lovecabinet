@@ -10,6 +10,7 @@ import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
+import OnThisDay from '@/components/OnThisDay.vue'
 import ReplayPlayer from '@/components/ReplayPlayer.vue'
 import ReplayRangeSheet from '@/components/ReplayRangeSheet.vue'
 
@@ -84,6 +85,7 @@ function saveJar() {
       <button class="chip replay-chip" @click="choosingRange = true"><Play :size="14" fill="currentColor" /> Xem lại kỷ niệm</button>
       <button class="chip replay-chip" @click="navigate('map')"><MapIcon :size="14" /> Bản đồ</button>
     </div>
+    <OnThisDay />
     <ReplayRangeSheet v-if="choosingRange" @start="replayRange" @close="choosingRange = false" />
     <ReplayPlayer v-if="replaying" :memories="replaying" @close="replaying = null" />
 
