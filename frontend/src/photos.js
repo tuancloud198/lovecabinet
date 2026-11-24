@@ -1,13 +1,36 @@
-import { getToken } from '@/api.js'
+import { api, getToken } from '@/api.js'
 
-// Photos are private (token-protected), so they are fetched as blobs. Cache the
-// resulting object URLs so a photo is downloaded once per session instead of on
-// every view mount (jar list, memory page, thumbnails, full-screen viewer).
+// Photos are private. With the CDN they are files at /media/… that this browser may read thanks to signed
+// cookies (set by mediaAccess(), scoped to the couple's folder, served from the nearest edge); otherwise
+// they come from the API with the login token. Either way they are fetched as blobs and the object URLs
+// cached, so a photo is downloaded once per session instead of on every view mount.
 const cache = new Map() // url -> Promise<objectURL | ''>
+const fromCdn = url => url.startsWith('/media/')
+
+// The CDN cookies last 7 days; refresh them on every load (at most every 6 hours) and when one is refused.
+const ACCESS_EVERY = 6 * 3600 * 1000
+let access = null
+let accessAt = 0
+export function mediaAccess(force = false) {
+  if (force || !access || Date.now() - accessAt > ACCESS_EVERY) {
+    accessAt = Date.now()
+    access = api('photos/access/', { method: 'POST' }).catch(() => { access = null })
+  }
+  return access
+}
+
+async function download(url) {
+  if (!fromCdn(url)) return fetch(url, { headers: { Authorization: `Token ${getToken()}` } })
+  await mediaAccess()
+  const response = await fetch(url)
+  if (response.status !== 403) return response
+  await mediaAccess(true) // cookies expired or for another couple: renew once and retry
+  return fetch(url)
+}
 
 export function photoSrc(url) {
   if (!cache.has(url)) {
-    const request = fetch(url, { headers: { Authorization: `Token ${getToken()}` } })
+    const request = download(url)
       .then(response => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
       .then(blob => URL.createObjectURL(blob))
       .catch(() => { cache.delete(url); return '' }) // allow a retry on the next mount
@@ -24,6 +47,7 @@ export function forgetPhoto(url) {
 
 export function clearPhotos() {
   for (const url of [...cache.keys()]) forgetPhoto(url)
+  access = null // the next account gets its own cookies
 }
 
 // Before upload, convert HEIC/HEIF and large photos to a JPEG of at most MAX_SIDE px on
@@ -68,7 +92,7 @@ export function preload(url) {
   if (url) photoSrc(url)
 }
 
-// Videos (MP4/MOV/WebM) are uploaded as they are and played from their signed `stream_url`.
+// Videos (MP4/MOV/WebM) are uploaded as they are and played from `stream_url` (the CDN, or a signed API link).
 export const isVideoFile = file => /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm)$/i.test(file.name)
 export const isVideo = item => item?.kind === 'video'
 /** A memory's photos and videos in the order they were added (the API lists newest first). */

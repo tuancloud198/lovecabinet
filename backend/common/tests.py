@@ -3,6 +3,7 @@ from io import BytesIO, StringIO
 from unittest.mock import ANY, patch, MagicMock
 from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.db.models.query import QuerySet
 from django.test import override_settings
@@ -182,7 +183,8 @@ class WorkflowTests(APITestCase):
         uploaded = [c.args[2] for c in storage.return_value.upload_fileobj.call_args_list]
         photo_id = response.data['id']
         key = Photo.objects.get(pk=photo_id).object_key
-        self.assertRegex(key, rf'^{memory.jar_id}/{memory.pk}/[0-9a-f]{{32}}\.png$')
+        couple_id = memory.jar.cabinet.couple_id
+        self.assertRegex(key, rf'^media/c{couple_id}/{memory.jar_id}/{memory.pk}/[0-9a-f]{{32}}\.png$')
         base = key.rsplit('.', 1)[0]
         self.assertEqual(uploaded, [key, base + '.thumb.jpg', base + '.display.jpg'])  # original + smaller copies
         thumb, display = (Image.open(c.args[0]) for c in storage.return_value.upload_fileobj.call_args_list[1:])
@@ -193,7 +195,7 @@ class WorkflowTests(APITestCase):
         other_jar = Jar.objects.create(cabinet=memory.jar.cabinet, name='Moved')
         self.assertEqual(self.client.patch(f'/api/memories/{memory.pk}/', {'jar': other_jar.pk}).status_code, 200)
         moved = Photo.objects.get(pk=photo_id).object_key
-        self.assertEqual(moved, f'{other_jar.pk}/{memory.pk}/' + key.rsplit('/', 1)[-1])
+        self.assertEqual(moved, f'media/c{couple_id}/{other_jar.pk}/{memory.pk}/' + key.rsplit('/', 1)[-1])
         self.assertEqual(storage.return_value.copy_object.call_count, 3)  # the copies move with it
         self.assertEqual({c.kwargs['Key'] for c in storage.return_value.delete_object.call_args_list}, {key, base + '.thumb.jpg', base + '.display.jpg'})
         storage.return_value.delete_object.reset_mock()
@@ -211,6 +213,70 @@ class WorkflowTests(APITestCase):
         self.auth(self.alice)
         self.assertEqual(self.client.delete(f'/api/photos/{photo_id}/').status_code, 204)
         self.assertEqual(storage.return_value.delete_object.call_count, 3)
+    @patch('photos.services.storage')
+    def test_media_cdn_urls_and_cookies(self, storage):
+        import base64, json
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
+        from photos import cdn
+        memory = self.setup_memory()
+        couple_id = memory.jar.cabinet.couple_id
+        prefix = f'media/c{couple_id}/{memory.jar_id}/{memory.pk}/'
+        photo = Photo.objects.create(memory=memory, object_key=prefix + 'a.png', content_type='image/png', variants=True)
+        video = Photo.objects.create(memory=memory, object_key=prefix + 'b.mp4', content_type='video/mp4')
+        old = Photo.objects.create(memory=memory, object_key=f'{memory.jar_id}/{memory.pk}/c.png', content_type='image/png')
+        # CDN off: everything through the API, and no cookies.
+        response = self.client.post('/api/photos/access/')
+        self.assertEqual(response.data, {'cdn': False})
+        self.assertEqual(response.cookies['CloudFront-Policy'].value, '')  # cleared
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+        with override_settings(MEDIA_CDN_KEY_ID='K2TEST', MEDIA_CDN_PRIVATE_KEY=base64.b64encode(pem).decode()):
+            items = {p['id']: p for p in self.client.get(f'/api/memories/{memory.pk}/').data['photos']}
+            self.assertEqual((items[photo.pk]['url'], items[photo.pk]['thumb_url'], items[photo.pk]['display_url']),
+                             (f'/{prefix}a.png', f'/{prefix}a.thumb.jpg', f'/{prefix}a.display.jpg'))
+            self.assertEqual(items[video.pk]['stream_url'], f'/{prefix}b.mp4')
+            self.assertEqual(items[old.pk]['url'], f'/api/photos/{old.pk}/content/')  # not moved yet: still the API
+            response = self.client.post('/api/photos/access/')
+            self.assertEqual(response.data, {'cdn': True})
+            cookies = response.cookies
+            self.assertEqual(cookies['CloudFront-Key-Pair-Id'].value, 'K2TEST')
+            for name in cdn.COOKIES:
+                self.assertEqual((cookies[name]['path'], cookies[name]['secure'], cookies[name]['httponly']), ('/media/', True, True))
+            unsafe = str.maketrans('-_~', '+=/')
+            policy = base64.b64decode(cookies['CloudFront-Policy'].value.translate(unsafe))
+            statement = json.loads(policy)['Statement'][0]
+            self.assertEqual(statement['Resource'], f'https://*/media/c{couple_id}/*')  # only this couple's folder
+            self.assertGreater(statement['Condition']['DateLessThan']['AWS:EpochTime'], timezone.now().timestamp() + 6 * 24 * 3600)
+            key.public_key().verify(base64.b64decode(cookies['CloudFront-Signature'].value.translate(unsafe)), policy, padding.PKCS1v15(), hashes.SHA1())
+            self.auth(self.other)  # not paired: no access
+            response = self.client.post('/api/photos/access/')
+            self.assertEqual((response.data, response.cookies['CloudFront-Signature'].value), ({'cdn': False}, ''))
+            from rest_framework.authtoken.models import Token
+            self.client.force_authenticate(None)
+            self.client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=self.alice).key}')
+            response = self.client.post('/api/auth/logout/')
+            self.assertEqual(response.status_code, 204)
+            self.assertEqual(response.cookies['CloudFront-Policy'].value, '')  # logout clears them
+    @patch('photos.services.storage')
+    def test_move_media_to_couple_folders(self, storage):
+        memory = self.setup_memory()
+        couple_id = memory.jar.cabinet.couple_id
+        Photo.objects.create(memory=memory, object_key=f'{memory.jar_id}/{memory.pk}/a.png', content_type='image/png', variants=True)
+        Photo.objects.create(memory=memory, object_key=f'media/c{couple_id}/{memory.jar_id}/{memory.pk}/b.png', content_type='image/png')
+        out = StringIO()
+        call_command('move_media_to_couple_folders', '--dry-run', stdout=out)
+        self.assertIn('Would move 1 photos/videos (3 objects)', out.getvalue())
+        self.assertEqual(storage.return_value.copy_object.call_count, 0)
+        call_command('move_media_to_couple_folders', stdout=StringIO())
+        self.assertEqual(sorted(Photo.objects.values_list('object_key', flat=True)),
+                         [f'media/c{couple_id}/{memory.jar_id}/{memory.pk}/a.png', f'media/c{couple_id}/{memory.jar_id}/{memory.pk}/b.png'])
+        self.assertEqual(storage.return_value.copy_object.call_count, 3)  # original + 2 smaller copies
+        self.assertEqual({c.kwargs['Key'] for c in storage.return_value.delete_object.call_args_list},
+                         {f'{memory.jar_id}/{memory.pk}/a.png', f'{memory.jar_id}/{memory.pk}/a.thumb.jpg', f'{memory.jar_id}/{memory.pk}/a.display.jpg'})
+        out = StringIO()
+        call_command('move_media_to_couple_folders', stdout=out)  # nothing left
+        self.assertIn('Moved 0 photos/videos', out.getvalue())
     @patch('photos.services.storage')
     def test_heic_upload_is_stored_as_jpeg(self, storage):
         memory = self.setup_memory()
@@ -340,7 +406,7 @@ class WorkflowTests(APITestCase):
         memory = Memory.objects.get()
         self.assertEqual(len(response.data['photos']), 2)
         for photo in memory.photos.all():
-            self.assertRegex(photo.object_key, rf'^{jar}/{memory.pk}/[0-9a-f]{{32}}\.png$')
+            self.assertRegex(photo.object_key, rf'^media/c{memory.jar.cabinet.couple_id}/{jar}/{memory.pk}/[0-9a-f]{{32}}\.png$')
         deleted = {c.kwargs['Key'] for c in storage.return_value.delete_object.call_args_list}
         self.assertEqual(deleted, set(staged))  # staged originals and copies removed after commit
         self.assertTrue(all(p.variants for p in memory.photos.all()))

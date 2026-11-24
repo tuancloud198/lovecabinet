@@ -1,6 +1,6 @@
 import { reactive, computed } from 'vue'
 import { api, getToken, setToken, TOKEN_KEY } from '@/api.js'
-import { clearPhotos } from '@/photos.js'
+import { clearPhotos, mediaAccess } from '@/photos.js'
 
 const emptyInvites = () => ({ received: [], sent: [] })
 
@@ -68,7 +68,10 @@ export async function load() {
   const couples = await api('couples/')
   state.couple = couples[0] || null
   if (state.couple) {
-    ;[state.cabinets, state.jars, state.memories, state.events, state.quiz, state.shop] = await Promise.all(['cabinets/', 'jars/', 'memories/', 'events/', 'quiz-questions/', 'shop/'].map(path => api(path)))
+    ;[state.cabinets, state.jars, state.memories, state.events, state.quiz, state.shop] = await Promise.all([
+      ...['cabinets/', 'jars/', 'memories/', 'events/', 'quiz-questions/', 'shop/'].map(path => api(path)),
+      mediaAccess(), // CDN cookies before any <img>/<video> asks for a photo
+    ])
   } else {
     state.invites = await api('couple-invitations/')
   }

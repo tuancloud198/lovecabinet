@@ -63,9 +63,14 @@ def upload_with_variants(client, key, upload):
 
 EXTENSIONS = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm'}
 
+def memory_prefix(memory):
+    """media/c{couple id}/{jar id}/{memory id}/: everything of a couple under one folder, so the CDN cookie
+    can allow exactly that folder (photos/cdn.py)."""
+    return f'media/c{memory.jar.cabinet.couple_id}/{memory.jar_id}/{memory.pk}/'
+
 def object_key(memory, content_type):
-    """{jar id}/{memory id}/{random}.{ext}: grouped per jar and memory; the random name lets a memory hold many photos."""
-    return f'{memory.jar_id}/{memory.pk}/{uuid.uuid4().hex}.{EXTENSIONS[content_type]}'
+    """{memory prefix}{random}.{ext}: the random name lets a memory hold many photos and can't be guessed."""
+    return f'{memory_prefix(memory)}{uuid.uuid4().hex}.{EXTENSIONS[content_type]}'
 
 NO_LOCATION = {'latitude': None, 'longitude': None, 'place': ''}
 
@@ -125,8 +130,9 @@ def attach_staged(memory, staged):
     transaction.on_commit(remove_staged)
 
 def relocate_photos(memory):
-    """After a memory moves to another jar, move its objects so keys stay {jar id}/{memory id}/…."""
-    prefix = f'{memory.jar_id}/{memory.pk}/'
+    """After a memory moves to another jar (or for keys from an older layout), move its objects so keys
+    stay {memory prefix}…. Each photo is copied, saved, then the old objects removed: safe while in use."""
+    prefix = memory_prefix(memory)
     photos = [p for p in memory.photos.all() if not p.object_key.startswith(prefix)]
     if not photos:
         return
@@ -151,7 +157,8 @@ def _stream_signature(pk, offset=0):
     return signing.Signer(salt=STREAM_SALT).signature(f'{pk}:{window}')
 
 def stream_url(photo):
-    return f'/api/photos/{photo.pk}/stream/?sig={_stream_signature(photo.pk)}'
+    from photos import cdn
+    return cdn.url(photo.object_key) or f'/api/photos/{photo.pk}/stream/?sig={_stream_signature(photo.pk)}'
 
 def valid_stream_signature(pk, sig):
     return any(constant_time_compare(sig or '', _stream_signature(pk, offset)) for offset in (0, 1))

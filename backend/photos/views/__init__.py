@@ -25,6 +25,19 @@ class PhotoViewSet(viewsets.GenericViewSet):
         serializer = StageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response({'token': stage_photo(request.user, serializer.validated_data['file'], serializer.location())}, status=201)
+    @action(detail=False, methods=['post'])
+    def access(self, request):
+        """(Re)set the CDN cookies that let this browser load its couple's photos/videos (photos/cdn.py).
+        The app calls it on every load, so they never expire while it's in use."""
+        from couples.models import Membership
+        from photos import cdn
+        membership = Membership.objects.filter(user=request.user).first()
+        response = Response({'cdn': cdn.enabled() and membership is not None})
+        if response.data['cdn']:
+            cdn.set_cookies(response, membership.couple_id)
+        else:
+            cdn.clear_cookies(response)
+        return response
     @action(detail=True, methods=['get'])
     def content(self, request, pk=None):
         photo = self.get_object()

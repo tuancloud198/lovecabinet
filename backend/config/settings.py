@@ -33,4 +33,9 @@ MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'lovecabinet') or None
 MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', 'local-minio-password') or None
 MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'memories')
 MINIO_REGION = os.environ.get('MINIO_REGION', 'us-east-1')
+# Photos/videos through CloudFront (see photos/cdn.py): the CloudFront public key id and the matching RSA
+# private key (PEM, base64-encoded so it fits on one .env line). Unset = served by the API (local dev).
+MEDIA_CDN_KEY_ID = os.environ.get('MEDIA_CDN_KEY_ID', '')
+MEDIA_CDN_PRIVATE_KEY = os.environ.get('MEDIA_CDN_PRIVATE_KEY', '')
+MEDIA_COOKIE_MAX_AGE = 7 * 24 * 3600
 DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024

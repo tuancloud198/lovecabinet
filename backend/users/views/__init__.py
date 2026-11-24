@@ -64,5 +64,8 @@ def avatar(request, pk):
     return response
 @api_view(['POST'])
 def logout(request):
+    from photos import cdn
     logout_user(request.auth)
-    return Response(status=204)
+    response = Response(status=204)
+    cdn.clear_cookies(response)  # this browser can't load the couple's photos any more
+    return response

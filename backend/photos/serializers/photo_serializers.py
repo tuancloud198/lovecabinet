@@ -38,14 +38,20 @@ class PhotoSerializer(serializers.ModelSerializer):
     display_url = serializers.SerializerMethodField()
     kind = serializers.SerializerMethodField()
     stream_url = serializers.SerializerMethodField()
-    # Photos come in three sizes through the authenticated API: the original, ~400 px (thumb) for lists
-    # and ~1600 px (display) for the memory page and replay. Videos have none (they play from stream_url).
+    # Photos come in three sizes: the original, ~400 px (thumb) for lists and ~1600 px (display) for the
+    # memory page and replay. Videos have none (they play from stream_url). From the CDN (/media/…, signed
+    # cookie) when it's on, else through the authenticated API.
     def get_url(self, obj):
-        return f'/api/photos/{obj.pk}/content/'
+        from photos import cdn
+        return cdn.url(obj.object_key) or f'/api/photos/{obj.pk}/content/'
     def _sized(self, obj, size):
+        from photos import cdn
+        from photos.services import variant_key
         if obj.content_type.startswith('video/'):
             return None
-        return f'/api/photos/{obj.pk}/content/?size={size}' if obj.variants else self.get_url(obj)
+        if not obj.variants:
+            return self.get_url(obj)
+        return cdn.url(variant_key(obj.object_key, size)) or f'/api/photos/{obj.pk}/content/?size={size}'
     def get_thumb_url(self, obj):
         return self._sized(obj, 'thumb')
     def get_display_url(self, obj):
