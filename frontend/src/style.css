@@ -612,3 +612,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .preview-text strong { font-size: 13px; }
 .preview-text small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page:has(~ .preview-bar), main:has(~ .preview-bar) .page { padding-bottom: 96px; }
+.bottom-nav.locked button { opacity: .45; }
+.preview-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone:has(.preview-bar) .toast { bottom: calc(var(--nav-height) + 92px); } /* above the preview bar */

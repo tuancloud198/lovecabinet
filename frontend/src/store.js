@@ -33,6 +33,8 @@ export const state = reactive({
 export const partner = computed(() => state.couple?.members.find(m => m.id !== state.me?.id) || null)
 
 export function navigate(name, params = {}) {
+  // Trying a shop item keeps you on the shop: leave the preview (✕) or buy first.
+  if (state.preview) { toast('Thoát xem thử hoặc mua trước nhé'); return }
   state.view = { name, params }
   window.scrollTo(0, 0)
   // These screens list jars/cabinets the partner may have just created on their phone.

@@ -12,7 +12,7 @@ const short = computed(() => Math.max(0, item.value.price - (state.shop?.balance
 <template>
   <div class="preview-bar" role="status">
     <Eye :size="18" />
-    <span class="preview-text"><strong>Đang xem thử</strong><small>{{ item.name }}</small></span>
+    <span class="preview-text"><strong>{{ item.name }}</strong><small>Đang xem thử</small></span>
     <button v-if="!owned" class="btn primary small" :disabled="state.busy || short > 0" @click="buy(item)">{{ short > 0 ? `Thiếu ${short} điểm` : `Mua · ${item.price}` }}</button>
     <button class="icon-button" aria-label="Thoát xem thử" @click="stopPreview"><X :size="18" /></button>
   </div>
