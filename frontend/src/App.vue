@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { X } from 'lucide-vue-next'
 import { state, navigate, run, load, refresh } from '@/store.js'
 import BottomNav from '@/components/BottomNav.vue'
@@ -20,6 +20,12 @@ const views = { cabinet: CabinetView, calendar: CalendarView, capture: CaptureVi
 const TABS = ['calendar', 'cabinet', 'quiz', 'pet', 'profile']
 const showNav = computed(() => TABS.includes(state.view.name))
 const viewKey = computed(() => state.view.name + JSON.stringify(state.view.params))
+
+// Each partner's own look (a theme bought in the shop): <html data-theme="pink">.
+watch(() => state.me?.theme, theme => {
+  if (theme) document.documentElement.dataset.theme = theme
+  else delete document.documentElement.dataset.theme
+}, { immediate: true })
 
 // Coming back to the app (switching tabs, unlocking the phone): pick up what the partner added.
 function onVisibility() { if (document.visibilityState === 'visible') refresh() }

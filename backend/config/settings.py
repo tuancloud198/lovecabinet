@@ -4,7 +4,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'development-only-change-before-deploy')
 DEBUG = os.environ.get('DEBUG', '0') == '1'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend,testserver').split(',')
-INSTALLED_APPS = ['django.contrib.auth', 'django.contrib.contenttypes', 'django.contrib.sessions', 'rest_framework', 'rest_framework.authtoken', 'users', 'couple_invitations', 'couples', 'cabinets', 'jars', 'memories', 'photos', 'events', 'quizzes']
+INSTALLED_APPS = ['django.contrib.auth', 'django.contrib.contenttypes', 'django.contrib.sessions', 'rest_framework', 'rest_framework.authtoken', 'users', 'couple_invitations', 'couples', 'cabinets', 'jars', 'memories', 'photos', 'events', 'quizzes', 'shop']
 MIDDLEWARE = ['django.middleware.security.SecurityMiddleware', 'django.contrib.sessions.middleware.SessionMiddleware', 'django.middleware.common.CommonMiddleware', 'django.middleware.csrf.CsrfViewMiddleware', 'django.contrib.auth.middleware.AuthenticationMiddleware']
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'

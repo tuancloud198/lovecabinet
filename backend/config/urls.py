@@ -10,6 +10,7 @@ from photos.views import PhotoViewSet, stream as photo_stream
 from events.views import EventViewSet
 from quizzes.views import QuestionViewSet
 from common import health
+from shop import views as shop
 router = DefaultRouter()
 for prefix, view, basename in [('couples', CoupleViewSet, 'couple'), ('cabinets', CabinetViewSet, 'cabinet'), ('jars', JarViewSet, 'jar'), ('memories', MemoryViewSet, 'memory'), ('photos', PhotoViewSet, 'photo'), ('events', EventViewSet, 'event'), ('quiz-questions', QuestionViewSet, 'quiz-question')]:
     router.register(prefix, view, basename=basename)
@@ -18,7 +19,7 @@ urlpatterns = [path('api/photos/<int:pk>/stream/', photo_stream), path('api/heal
                 path('api/auth/logout/', users.logout), 
                 path('api/auth/google/', users.google), 
                 path('api/auth/config/', users.auth_config), 
-                path('api/users/me/', users.me), path('api/users/me/avatar/', users.my_avatar), path('api/users/<int:pk>/avatar/', users.avatar), 
+                path('api/users/me/', users.me), path('api/shop/', shop.shop), path('api/shop/<str:item>/buy/', shop.buy_item), path('api/users/me/avatar/', users.my_avatar), path('api/users/<int:pk>/avatar/', users.avatar), 
                 path('api/couple-invitations/', 
                 invitations.invitations), 
                 path('api/couple-invitations/<int:pk>/accept/', invitations.accept), 

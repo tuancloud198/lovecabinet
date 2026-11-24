@@ -548,3 +548,57 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .stats { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); }
 .map-sheet-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 .location-card .location-text { white-space: normal; overflow: visible; }
+
+/* Shop theme "Hồng ngọt ngào" (theme_pink): the same tokens in soft rose. */
+:root[data-theme="pink"] {
+  --primary: #C94F7C;
+  --primary-strong: #B03F6A;
+  --primary-light: #FCE4EE;
+  --accent: #F4A9C0;
+  --secondary: #8E5B9F;
+  --secondary-light: #F3E8F7;
+  --bg: #FFF6F9;
+  --border: #EBC3D2;
+  --border-soft: #F6DDE7;
+  --text: #3A2630;
+  --muted: #846473;
+  --wood: #F2C1D1;
+  --wood-dark: #D58AA5;
+  --wood-plank: #E3A1B8;
+  --wood-light: #FADCE6;
+  --wood-edge-top: #EBAFC4;
+  --wood-edge-bottom: #C7798F;
+  --page-bg: #F9E1EA;
+  --heading: #A23862;
+  --primary-top: #D7618C;
+  --primary-border: #EFA9C3;
+  --primary-glow: rgba(201, 79, 124, .28);
+  --primary-glow-strong: rgba(201, 79, 124, .35);
+  --chip-soft: #FBEAF1;
+  --track: #F6DCE6;
+  --fill-start: #EE7FA5;
+  --hover: #FDEFF4;
+  --stage-ground: #F3C6D5;
+  --shadow: 0 6px 20px rgba(160, 60, 100, .10);
+}
+
+/* Nhân Vật: Bạn nhỏ | Cửa hàng */
+.pet-tabs { margin-bottom: 12px; }
+.pet-tabs button { font-size: 13px; padding: 8px; }
+.shop .subhead { margin: 18px 0 8px; }
+.wallet { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; padding: 14px 16px; }
+.wallet-icon { grid-row: span 2; display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 50%; background: var(--primary-light); color: var(--primary); }
+.wallet-main { display: flex; align-items: baseline; gap: 8px; }
+.wallet-main small { color: var(--muted); font-weight: 600; }
+.wallet-main strong { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1.1; }
+.wallet-detail { color: var(--muted); font-size: 12px; }
+.shop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.shop-item { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
+.shop-item.active { outline: 2px solid var(--primary); }
+.shop-item small { font-size: 12px; }
+.shop-item .btn { margin-top: auto; }
+.shop-item.soon { opacity: .75; }
+.theme-swatches { display: grid; grid-template-columns: repeat(4, 1fr); height: 48px; border-radius: var(--r-m); overflow: hidden; border: 1px solid var(--border-soft); }
+.theme-swatches i { display: block; }
+.shop-soon-art { display: flex; align-items: center; justify-content: center; height: 48px; font-size: 32px; border-radius: var(--r-m); background: var(--chip-soft); filter: grayscale(.4); }
+.shop-hint { font-size: 12px; margin-top: 14px; }

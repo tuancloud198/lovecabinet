@@ -31,6 +31,8 @@ class User(AbstractUser):
     google_sub = models.CharField(max_length=255, unique=True, null=True, blank=True, editable=False)
     # Own profile picture in S3 (users/avatars.py); empty = the default character art.
     avatar_key = models.CharField(max_length=200, blank=True, editable=False)
+    # Own look of the app: '' = default, or a theme the couple bought in the shop (e.g. 'pink').
+    theme = models.CharField(max_length=30, blank=True)
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

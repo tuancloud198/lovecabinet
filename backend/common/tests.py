@@ -466,6 +466,29 @@ class WorkflowTests(APITestCase):
         response = self.client.delete('/api/users/me/avatar/')
         self.assertIsNone(response.data['avatar_url'])
         storage.return_value.delete_object.assert_called_once_with(Bucket=ANY, Key=key)
+    def test_shop_points_buy_and_theme(self):
+        from couples.models import Couple
+        memory = self.setup_memory()  # 1 memory = 10 points
+        couple = Couple.objects.get()
+        shop = self.client.get('/api/shop/').data
+        self.assertEqual((shop['earned'], shop['spent'], shop['balance']), (10, 0, 10))
+        self.assertEqual([(i['id'], i['price'], i['owned']) for i in shop['items']], [('theme_pink', 50, False)])
+        self.assertEqual(self.client.post('/api/shop/theme_pink/buy/').status_code, 400)  # not enough points
+        self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'pink'}, format='json').status_code, 400)  # not owned
+        couple.pet_points = 42  # e.g. 21 quiz answers
+        couple.save()
+        response = self.client.post('/api/shop/theme_pink/buy/')
+        self.assertEqual((response.status_code, response.data['spent'], response.data['balance'], response.data['items'][0]['owned']), (201, 50, 2, True))
+        self.assertEqual(self.client.post('/api/shop/theme_pink/buy/').status_code, 400)  # bought once per couple
+        self.assertEqual(self.client.post('/api/shop/cat/buy/').status_code, 404)
+        couple.refresh_from_db()
+        self.assertEqual(couple.pet_points, 42)  # buying never takes points from the pet
+        self.auth(self.bob)  # the partner owns it too and picks their own theme
+        self.assertEqual(self.client.get('/api/shop/').data['balance'], 2)
+        self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'pink'}, format='json').data['theme'], 'pink')
+        self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'ocean'}, format='json').status_code, 400)
+        self.auth(self.alice)
+        self.assertEqual(self.client.get('/api/users/me/').data['theme'], '')
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

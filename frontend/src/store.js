@@ -14,6 +14,8 @@ export const state = reactive({
   events: [],
   /** Couple quiz questions (both partners'), newest first. */
   quiz: [],
+  /** Shop points ({ earned, spent, balance }) and items ({ id, kind, name, price, owned }). */
+  shop: null,
   invites: emptyInvites(),
   busy: false,
   error: '',
@@ -64,7 +66,7 @@ export async function load() {
   const couples = await api('couples/')
   state.couple = couples[0] || null
   if (state.couple) {
-    ;[state.cabinets, state.jars, state.memories, state.events, state.quiz] = await Promise.all(['cabinets/', 'jars/', 'memories/', 'events/', 'quiz-questions/'].map(path => api(path)))
+    ;[state.cabinets, state.jars, state.memories, state.events, state.quiz, state.shop] = await Promise.all(['cabinets/', 'jars/', 'memories/', 'events/', 'quiz-questions/', 'shop/'].map(path => api(path)))
   } else {
     state.invites = await api('couple-invitations/')
   }
@@ -108,7 +110,7 @@ export async function signIn(token) {
 function signOutLocally() {
   setToken('')
   clearPhotos()
-  Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], quiz: [], invites: emptyInvites(), onboarding: '', justPaired: false, view: { name: 'cabinet', params: {} } })
+  Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], quiz: [], shop: null, invites: emptyInvites(), onboarding: '', justPaired: false, view: { name: 'cabinet', params: {} } })
 }
 
 // Signing out (or in as someone else) in another tab applies here too.
