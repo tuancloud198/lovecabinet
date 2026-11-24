@@ -4,7 +4,7 @@
 import { ref, computed } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { displayDate, isoDate } from '@/format.js'
-import { coverPhoto } from '@/photos.js'
+import { coverPhoto, thumbOf } from '@/photos.js'
 import { state, navigate } from '@/store.js'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
 import ReplayPlayer from '@/components/ReplayPlayer.vue'
@@ -48,7 +48,7 @@ const replaying = ref(false)
       <div class="on-this-day-strip">
         <button v-for="memory in g.memories" :key="memory.id" class="on-this-day-item" @click="navigate('memory', { id: memory.id })">
           <span class="on-this-day-thumb">
-            <PrivatePhoto v-if="coverPhoto(memory)" :url="coverPhoto(memory).url" alt="" />
+            <PrivatePhoto v-if="coverPhoto(memory)" :url="thumbOf(coverPhoto(memory))" alt="" />
             <span v-else>{{ memory.emoji }}</span>
           </span>
           <span class="on-this-day-title">{{ memory.title }}</span>

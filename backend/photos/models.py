@@ -10,3 +10,5 @@ class Photo(Timestamped):
     latitude = models.FloatField(null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
     longitude = models.FloatField(null=True, blank=True, validators=[MinValueValidator(-180), MaxValueValidator(180)])
     place = models.CharField(max_length=120, blank=True)
+    # Smaller JPEG copies next to the original ({name}.thumb.jpg, {name}.display.jpg); photos only.
+    variants = models.BooleanField(default=False)

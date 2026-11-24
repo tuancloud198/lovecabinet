@@ -34,10 +34,22 @@ def video_type(header):
 class PhotoSerializer(serializers.ModelSerializer):
     """A photo or video of a memory. Videos are played from `stream_url` (signed, supports seeking)."""
     url = serializers.SerializerMethodField()
+    thumb_url = serializers.SerializerMethodField()
+    display_url = serializers.SerializerMethodField()
     kind = serializers.SerializerMethodField()
     stream_url = serializers.SerializerMethodField()
+    # Photos come in three sizes through the authenticated API: the original, ~400 px (thumb) for lists
+    # and ~1600 px (display) for the memory page and replay. Videos have none (they play from stream_url).
     def get_url(self, obj):
         return f'/api/photos/{obj.pk}/content/'
+    def _sized(self, obj, size):
+        if obj.content_type.startswith('video/'):
+            return None
+        return f'/api/photos/{obj.pk}/content/?size={size}' if obj.variants else self.get_url(obj)
+    def get_thumb_url(self, obj):
+        return self._sized(obj, 'thumb')
+    def get_display_url(self, obj):
+        return self._sized(obj, 'display')
     def get_kind(self, obj):
         return 'video' if obj.content_type.startswith('video/') else 'image'
     def get_stream_url(self, obj):
@@ -45,7 +57,7 @@ class PhotoSerializer(serializers.ModelSerializer):
         return stream_url(obj) if obj.content_type.startswith('video/') else None
     class Meta:
         model = Photo
-        fields = ['id', 'memory', 'url', 'kind', 'stream_url', 'latitude', 'longitude', 'place']
+        fields = ['id', 'memory', 'url', 'thumb_url', 'display_url', 'kind', 'stream_url', 'latitude', 'longitude', 'place']
 
 def heif_to_jpeg(upload):
     """Most browsers can't display HEIC/HEIF, so store those photos as JPEG instead."""

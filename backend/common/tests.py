@@ -179,26 +179,38 @@ class WorkflowTests(APITestCase):
         Image.new('RGB', (8,8)).save(data, format='PNG')
         response = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('photo.png', data.getvalue(), content_type='image/png')}, format='multipart')
         self.assertEqual(response.status_code, 201)
-        storage.return_value.upload_fileobj.assert_called_once()
+        uploaded = [c.args[2] for c in storage.return_value.upload_fileobj.call_args_list]
         photo_id = response.data['id']
         key = Photo.objects.get(pk=photo_id).object_key
         self.assertRegex(key, rf'^{memory.jar_id}/{memory.pk}/[0-9a-f]{{32}}\.png$')
+        base = key.rsplit('.', 1)[0]
+        self.assertEqual(uploaded, [key, base + '.thumb.jpg', base + '.display.jpg'])  # original + smaller copies
+        thumb, display = (Image.open(c.args[0]) for c in storage.return_value.upload_fileobj.call_args_list[1:])
+        self.assertEqual((thumb.format, display.format), ('JPEG', 'JPEG'))
+        # Three sizes through the authenticated API.
+        self.assertEqual((response.data['url'], response.data['thumb_url'], response.data['display_url']),
+                         (f'/api/photos/{photo_id}/content/', f'/api/photos/{photo_id}/content/?size=thumb', f'/api/photos/{photo_id}/content/?size=display'))
         other_jar = Jar.objects.create(cabinet=memory.jar.cabinet, name='Moved')
         self.assertEqual(self.client.patch(f'/api/memories/{memory.pk}/', {'jar': other_jar.pk}).status_code, 200)
         moved = Photo.objects.get(pk=photo_id).object_key
         self.assertEqual(moved, f'{other_jar.pk}/{memory.pk}/' + key.rsplit('/', 1)[-1])
-        storage.return_value.copy_object.assert_called_once()
-        storage.return_value.delete_object.assert_called_once_with(Bucket=ANY, Key=key)
+        self.assertEqual(storage.return_value.copy_object.call_count, 3)  # the copies move with it
+        self.assertEqual({c.kwargs['Key'] for c in storage.return_value.delete_object.call_args_list}, {key, base + '.thumb.jpg', base + '.display.jpg'})
         storage.return_value.delete_object.reset_mock()
         storage.return_value.get_object.return_value = {'Body': BytesIO(data.getvalue())}
         content = self.client.get(f'/api/photos/{photo_id}/content/')
         self.assertEqual(content.status_code, 200)
         self.assertEqual(b''.join(content.streaming_content), data.getvalue())
+        self.assertEqual(content['Content-Type'], 'image/png')
+        storage.return_value.get_object.return_value = {'Body': BytesIO(b'small')}
+        thumb = self.client.get(f'/api/photos/{photo_id}/content/?size=thumb')
+        self.assertEqual((thumb.status_code, thumb['Content-Type']), (200, 'image/jpeg'))
+        self.assertEqual(storage.return_value.get_object.call_args.kwargs['Key'], moved.rsplit('.', 1)[0] + '.thumb.jpg')
         self.auth(self.other)
         self.assertEqual(self.client.get(f'/api/photos/{photo_id}/content/').status_code, 400)
         self.auth(self.alice)
         self.assertEqual(self.client.delete(f'/api/photos/{photo_id}/').status_code, 204)
-        storage.return_value.delete_object.assert_called_once()
+        self.assertEqual(storage.return_value.delete_object.call_count, 3)
     @patch('photos.services.storage')
     def test_heic_upload_is_stored_as_jpeg(self, storage):
         memory = self.setup_memory()
@@ -209,10 +221,10 @@ class WorkflowTests(APITestCase):
         photo = Photo.objects.get(pk=response.data['id'])
         self.assertEqual(photo.content_type, 'image/jpeg')
         self.assertRegex(photo.object_key, r'\.jpg$')
-        fileobj, _, _ = storage.return_value.upload_fileobj.call_args.args
-        self.assertEqual(storage.return_value.upload_fileobj.call_args.kwargs['ExtraArgs'], {'ContentType': 'image/jpeg'})
-        stored = Image.open(fileobj)
-        self.assertEqual((stored.format, stored.width), ('JPEG', 4096))  # downscaled to MAX_SIDE
+        original, thumb, display = storage.return_value.upload_fileobj.call_args_list
+        self.assertEqual(original.kwargs['ExtraArgs'], {'ContentType': 'image/jpeg'})
+        self.assertEqual((Image.open(original.args[0]).format, Image.open(original.args[0]).width), ('JPEG', 4096))  # downscaled to MAX_SIDE
+        self.assertEqual((Image.open(thumb.args[0]).width, Image.open(display.args[0]).width), (400, 1600))
     @patch('photos.services.storage')
     def test_iphone_mpo_jpeg_is_accepted(self, storage):  # JPEG + HDR gain map; Pillow reports MPO
         memory = self.setup_memory()
@@ -278,6 +290,20 @@ class WorkflowTests(APITestCase):
         self.assertEqual(places[2], (None, None, ''))
         added = self.client.post('/api/photos/', {'memory': memory.pk, 'file': SimpleUploadedFile('e.jpg', jpeg(), content_type='image/jpeg'), 'latitude': 16.05, 'longitude': 108.2, 'place': 'Đà Nẵng'}, format='multipart')
         self.assertEqual((added.status_code, added.data['place']), (201, 'Đà Nẵng'))
+    @patch('photos.management.commands.make_photo_variants.storage')
+    def test_make_photo_variants_for_existing_photos(self, storage):
+        from django.core.management import call_command
+        memory = self.setup_memory()
+        data = BytesIO()
+        Image.new('RGB', (3000, 2000), 'green').save(data, format='JPEG')
+        old = Photo.objects.create(memory=memory, object_key='1/1/old.jpg', content_type='image/jpeg')
+        video = Photo.objects.create(memory=memory, object_key='1/1/clip.mp4', content_type='video/mp4')
+        storage.return_value.get_object.return_value = {'Body': BytesIO(data.getvalue())}
+        call_command('make_photo_variants', stdout=StringIO())
+        old.refresh_from_db(); video.refresh_from_db()
+        self.assertEqual((old.variants, video.variants), (True, False))  # videos have no copies
+        keys = {c.args[2]: Image.open(c.args[0]).size for c in storage.return_value.upload_fileobj.call_args_list}
+        self.assertEqual(keys, {'1/1/old.thumb.jpg': (400, 267), '1/1/old.display.jpg': (1600, 1067)})
     @patch('photos.services.storage')
     def test_memory_created_only_with_all_staged_photos(self, storage):
         self.pair()
@@ -290,8 +316,9 @@ class WorkflowTests(APITestCase):
             response = self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile(f'{i}.png', data.getvalue(), content_type='image/png')}, format='multipart')
             self.assertEqual(response.status_code, 201)
             tokens.append(response.data['token'])
-        staged_key = storage.return_value.upload_fileobj.call_args.args[2]
-        self.assertTrue(staged_key.startswith('staging/'))
+        staged = [c.args[2] for c in storage.return_value.upload_fileobj.call_args_list]
+        self.assertEqual(len(staged), 6)  # 2 photos x (original, thumb, display)
+        self.assertTrue(all(k.startswith('staging/') for k in staged))
         self.assertFalse(Memory.objects.exists())  # nothing saved yet
         body = {'jar': jar, 'title': 'Đà Lạt', 'date': '2026-11-19', 'staged_photos': tokens}
         # A tampered token is rejected and no memory is created.
@@ -304,7 +331,7 @@ class WorkflowTests(APITestCase):
             self.client.post('/api/memories/', body, format='json')
         self.assertFalse(Memory.objects.exists())
         self.assertFalse(Photo.objects.exists())
-        self.assertEqual(storage.return_value.delete_object.call_count, 1)
+        self.assertEqual(storage.return_value.delete_object.call_count, 1)  # the one copy made before the failure
         storage.return_value.copy_object.side_effect = None
         storage.return_value.delete_object.reset_mock()
         with self.captureOnCommitCallbacks(execute=True):
@@ -315,8 +342,8 @@ class WorkflowTests(APITestCase):
         for photo in memory.photos.all():
             self.assertRegex(photo.object_key, rf'^{jar}/{memory.pk}/[0-9a-f]{{32}}\.png$')
         deleted = {c.kwargs['Key'] for c in storage.return_value.delete_object.call_args_list}
-        self.assertEqual(len(deleted), 2)
-        self.assertTrue(all(k.startswith('staging/') for k in deleted))
+        self.assertEqual(deleted, set(staged))  # staged originals and copies removed after commit
+        self.assertTrue(all(p.variants for p in memory.photos.all()))
         # Tokens are bound to the uploader.
         self.auth(self.other)
         self.assertEqual(self.client.post('/api/photos/stage/', {'file': SimpleUploadedFile('x.png', data.getvalue(), content_type='image/png')}, format='multipart').status_code, 400)  # not paired

@@ -6,7 +6,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Pause, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-vue-next'
 import { displayDate } from '@/format.js'
-import { isVideo, mediaOf, photoSrc } from '@/photos.js'
+import { displayOf, isVideo, mediaOf, preload } from '@/photos.js'
 import { state } from '@/store.js'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
@@ -77,7 +77,7 @@ async function show() {
   progress.value = 0
   if (!slide.value) return
   const upcoming = slides.value[index.value + 1]?.item
-  if (upcoming && !isVideo(upcoming)) photoSrc(upcoming.url) // preload the next photo
+  if (upcoming && !isVideo(upcoming)) preload(displayOf(upcoming)) // so the next slide shows instantly
   if (paused.value) return
   if (isVideo(slide.value.item)) { await nextTick(); playVideo() } else runTimer()
 }
@@ -150,7 +150,7 @@ onBeforeUnmount(() => {
       <div class="replay-stage" @click="tap">
         <video v-if="isVideo(slide.item)" ref="video" :key="slide.item.id" :src="slide.item.stream_url" playsinline preload="auto"
                @timeupdate="onVideoTime" @ended="next"></video>
-        <PrivatePhoto v-else-if="slide.item" :key="slide.item.id" :url="slide.item.url" />
+        <PrivatePhoto v-else-if="slide.item" :key="slide.item.id" :url="displayOf(slide.item)" />
         <div v-else class="replay-card"><span>{{ slide.memory.emoji }}</span></div>
       </div>
 

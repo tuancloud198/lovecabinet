@@ -28,8 +28,9 @@ class PhotoViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=['get'])
     def content(self, request, pk=None):
         photo = self.get_object()
-        response = FileResponse(read_photo(photo), content_type=photo.content_type)
-        response['Cache-Control'] = 'private, max-age=300'
+        body, content_type = read_photo(photo, request.query_params.get('size'))
+        response = FileResponse(body, content_type=content_type)
+        response['Cache-Control'] = 'private, max-age=31536000, immutable'  # a photo's bytes never change
         response['X-Content-Type-Options'] = 'nosniff'
         return response
     def destroy(self, request, pk=None):

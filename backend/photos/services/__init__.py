@@ -1,3 +1,4 @@
+import io
 import time
 import uuid
 import boto3
@@ -14,6 +15,52 @@ from photos.models import Photo
 
 def storage():
     return boto3.client('s3', endpoint_url=settings.MINIO_ENDPOINT, aws_access_key_id=settings.MINIO_ACCESS_KEY, aws_secret_access_key=settings.MINIO_SECRET_KEY, region_name=settings.MINIO_REGION, config=Config(signature_version='s3v4'))
+
+# ---- Photo sizes: the original plus smaller JPEG copies, so lists and the memory page don't download
+# multi-MB originals. Copies sit next to the original: {jar}/{memory}/{name}.thumb.jpg / .display.jpg.
+VARIANTS = {'thumb': 400, 'display': 1600}  # long edge in px
+
+def variant_key(key, name):
+    return key.rsplit('.', 1)[0] + f'.{name}.jpg'
+
+def object_keys(photo):
+    """Every S3 object of a photo: the original and its smaller copies."""
+    return [photo.object_key] + ([variant_key(photo.object_key, name) for name in VARIANTS] if photo.variants else [])
+
+def make_variants(fileobj):
+    """{name: JPEG bytes} for an image file (EXIF rotation applied, transparency on white)."""
+    from PIL import Image, ImageOps
+    fileobj.seek(0)
+    with Image.open(fileobj) as image:
+        image = ImageOps.exif_transpose(image)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGBA')
+            background = Image.new('RGB', image.size, 'white')
+            background.paste(image, mask=image.getchannel('A'))
+            image = background
+        else:
+            image = image.convert('RGB')
+        variants = {}
+        for name, side in VARIANTS.items():
+            copy = image.copy()
+            copy.thumbnail((side, side), Image.Resampling.LANCZOS)
+            buffer = io.BytesIO()
+            copy.save(buffer, 'JPEG', quality=82, optimize=True, progressive=True)
+            variants[name] = buffer.getvalue()
+    fileobj.seek(0)
+    return variants
+
+def put_object(client, key, fileobj, content_type):
+    client.upload_fileobj(fileobj, settings.MINIO_BUCKET, key, ExtraArgs={'ContentType': content_type})
+
+def upload_with_variants(client, key, upload):
+    """Upload a file and, for images, its smaller copies. Returns whether copies were made."""
+    variants = make_variants(upload) if upload.content_type.startswith('image/') else {}
+    put_object(client, key, upload, upload.content_type)
+    for name, data in variants.items():
+        put_object(client, variant_key(key, name), io.BytesIO(data), 'image/jpeg')
+    return bool(variants)
+
 EXTENSIONS = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm'}
 
 def object_key(memory, content_type):
@@ -26,11 +73,12 @@ def upload_photo(user, memory_id, upload, location=NO_LOCATION):
     memory = get_object_or_404(Memory, pk=memory_id, jar__cabinet__couple=couple_for(user))
     key = object_key(memory, upload.content_type)
     client = storage()
-    client.upload_fileobj(upload, settings.MINIO_BUCKET, key, ExtraArgs={'ContentType': upload.content_type})
+    variants = upload_with_variants(client, key, upload)
     try:
-        return Photo.objects.create(memory=memory, object_key=key, content_type=upload.content_type, **location)
+        return Photo.objects.create(memory=memory, object_key=key, content_type=upload.content_type, variants=variants, **location)
     except Exception:
-        client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
+        for k in [key] + ([variant_key(key, name) for name in VARIANTS] if variants else []):
+            client.delete_object(Bucket=settings.MINIO_BUCKET, Key=k)
         raise
 
 STAGE_SALT = 'photos.stage'
@@ -41,8 +89,8 @@ def stage_photo(user, upload, location=NO_LOCATION):
     photos are uploaded). Returns a signed token naming the staged object."""
     couple_for(user)
     key = f'staging/{user.pk}/{uuid.uuid4().hex}.{EXTENSIONS[upload.content_type]}'
-    storage().upload_fileobj(upload, settings.MINIO_BUCKET, key, ExtraArgs={'ContentType': upload.content_type})
-    return signing.dumps({'key': key, 'type': upload.content_type, 'user': user.pk, 'location': location}, salt=STAGE_SALT)
+    variants = upload_with_variants(storage(), key, upload)
+    return signing.dumps({'key': key, 'type': upload.content_type, 'user': user.pk, 'location': location, 'variants': variants}, salt=STAGE_SALT)
 
 def read_staged(token, user):
     try:
@@ -61,16 +109,19 @@ def attach_staged(memory, staged):
     try:
         for item in staged:
             key = object_key(memory, item['type'])
-            client.copy_object(Bucket=settings.MINIO_BUCKET, Key=key, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': item['key']})
-            copied.append(key)
-            Photo.objects.create(memory=memory, object_key=key, content_type=item['type'], **(item.get('location') or NO_LOCATION))
+            pairs = [(item['key'], key)] + [(variant_key(item['key'], name), variant_key(key, name)) for name in VARIANTS if item.get('variants')]
+            for source, target in pairs:
+                client.copy_object(Bucket=settings.MINIO_BUCKET, Key=target, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': source})
+                copied.append(target)
+            Photo.objects.create(memory=memory, object_key=key, content_type=item['type'], variants=bool(item.get('variants')), **(item.get('location') or NO_LOCATION))
     except Exception:
         for key in copied:
             client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
         raise
     def remove_staged():
         for item in staged:
-            client.delete_object(Bucket=settings.MINIO_BUCKET, Key=item['key'])
+            for key in [item['key']] + [variant_key(item['key'], name) for name in VARIANTS if item.get('variants')]:
+                client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
     transaction.on_commit(remove_staged)
 
 def relocate_photos(memory):
@@ -81,11 +132,13 @@ def relocate_photos(memory):
         return
     client = storage()
     for photo in photos:
-        old = photo.object_key
-        photo.object_key = prefix + old.rsplit('/', 1)[-1]
-        client.copy_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': old})
+        old_keys = object_keys(photo)
+        photo.object_key = prefix + photo.object_key.rsplit('/', 1)[-1]
+        for old, new in zip(old_keys, object_keys(photo)):
+            client.copy_object(Bucket=settings.MINIO_BUCKET, Key=new, CopySource={'Bucket': settings.MINIO_BUCKET, 'Key': old})
         photo.save(update_fields=['object_key'])
-        client.delete_object(Bucket=settings.MINIO_BUCKET, Key=old)
+        for old in old_keys:
+            client.delete_object(Bucket=settings.MINIO_BUCKET, Key=old)
 
 # Videos play from a plain <video src>, which can't send the Authorization header, so each video
 # gets a signed link. The signature covers the photo id and a 6-hour window (stable within the
@@ -108,9 +161,14 @@ def read_range(photo, byte_range=None):
     extra = {'Range': byte_range} if byte_range else {}
     return storage().get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key, **extra)
 
-def read_photo(photo):
-    return storage().get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key)['Body']
+def read_photo(photo, size=None):
+    """The original, or a smaller copy ('thumb' / 'display') when it has one. Returns (body, content type)."""
+    if size in VARIANTS and photo.variants:
+        return storage().get_object(Bucket=settings.MINIO_BUCKET, Key=variant_key(photo.object_key, size))['Body'], 'image/jpeg'
+    return storage().get_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key)['Body'], photo.content_type
 
 def delete_photo(photo):
-    storage().delete_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key)
+    client = storage()
+    for key in object_keys(photo):
+        client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
     photo.delete()

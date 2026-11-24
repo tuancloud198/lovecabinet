@@ -59,6 +59,15 @@ export async function uploadablePhoto(file) {
   }
 }
 
+// Photo sizes: thumbnails (~400 px) in lists and strips, the display size (~1600 px) for the main photo
+// and replay, the original in the full-screen viewer.
+export const thumbOf = item => item?.thumb_url || item?.url
+export const displayOf = item => item?.display_url || item?.url
+/** Start downloading a photo in the background (e.g. the next one), so showing it is instant. */
+export function preload(url) {
+  if (url) photoSrc(url)
+}
+
 // Videos (MP4/MOV/WebM) are uploaded as they are and played from their signed `stream_url`.
 export const isVideoFile = file => /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm)$/i.test(file.name)
 export const isVideo = item => item?.kind === 'video'

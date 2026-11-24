@@ -8,7 +8,7 @@ import { Play, ZoomIn } from 'lucide-vue-next'
 import { displayDate } from '@/format.js'
 import { distanceKm, mediaPoints, NEAR_KM, summarize, VIETNAM } from '@/location.js'
 import { createMap, escapeHtml } from '@/map.js'
-import { isVideo, photoSrc } from '@/photos.js'
+import { isVideo, photoSrc, thumbOf } from '@/photos.js'
 import { state, navigate } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -78,7 +78,7 @@ function draw(fit) {
     const marker = L.marker([spot.latitude, spot.longitude], { icon: spotIcon(spot), spot, title: summarize(spot.points).label })
     marker.on('click', () => selectSpot(spot))
     layer.addLayer(marker)
-    if (spot.cover) photoSrc(spot.cover.url).then(src => { if (src) marker.setIcon(spotIcon(spot, src)) })
+    if (spot.cover) photoSrc(thumbOf(spot.cover)).then(src => { if (src) marker.setIcon(spotIcon(spot, src)) }) // the photo needs the token
   }
   if (!fit) return
   const focused = points.value.filter(p => p.memory.id === props.focus).map(p => [p.latitude, p.longitude])

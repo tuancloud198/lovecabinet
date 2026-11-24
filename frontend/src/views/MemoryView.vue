@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Camera, Heart, ImagePlus, MapPin, Pencil, Play, Send, Trash2, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
 import { appendLocation, hasLocation, namePlaces, photoLocation, placeGroups } from '@/location.js'
-import { forgetPhoto, isVideo, mediaOf, uploadablePhoto } from '@/photos.js'
+import { displayOf, forgetPhoto, isVideo, mediaOf, preload, thumbOf, uploadablePhoto } from '@/photos.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
@@ -20,6 +20,10 @@ const media = computed(() => mediaOf(memory.value)) // oldest first: new items g
 const photo = ref(0)
 const current = computed(() => Math.min(photo.value, Math.max(0, (media.value.length || 1) - 1)))
 const item = computed(() => media.value[current.value])
+// Preload the neighbours' display size, so moving to the next/previous photo is instant.
+watch(current, i => {
+  for (const near of [media.value[i + 1], media.value[i - 1]]) if (near && !isVideo(near)) preload(displayOf(near))
+}, { immediate: true })
 // The full-screen viewer shows photos only; videos play in place with their own controls.
 const images = computed(() => media.value.filter(p => !isVideo(p)))
 const viewing = ref(false)
@@ -112,7 +116,7 @@ function remove() {
       <template v-if="item">
         <video v-if="isVideo(item)" :key="item.id" class="photo-video" :src="item.stream_url" controls playsinline preload="metadata"></video>
         <button v-else type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
-          <PrivatePhoto :url="item.url" />
+          <PrivatePhoto :key="item.id" :url="displayOf(item)" />
         </button>
         <button type="button" class="photo-delete" :aria-label="isVideo(item) ? 'Xóa video này' : 'Xóa ảnh này'" :disabled="state.busy" @click="removePhoto(item)"><Trash2 :size="18" /></button>
       </template>
@@ -122,7 +126,7 @@ function remove() {
       <span v-for="(p, i) in media" :key="p.id" class="thumb-wrap" :class="{ chosen: current === i }">
         <button type="button" :aria-label="isVideo(p) ? `Video ${i + 1}` : `Ảnh ${i + 1}`" @click="photo = i">
           <span v-if="isVideo(p)" class="thumb-video"><video :src="`${p.stream_url}#t=0.1`" muted playsinline preload="metadata"></video><Play :size="16" fill="currentColor" /></span>
-          <PrivatePhoto v-else :url="p.url" alt="" />
+          <PrivatePhoto v-else :url="thumbOf(p)" alt="" />
         </button>
         <button type="button" class="thumb-remove" :aria-label="isVideo(p) ? 'Xóa video' : 'Xóa ảnh'" :disabled="state.busy" @click="removePhoto(p)"><X :size="12" /></button>
       </span>

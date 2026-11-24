@@ -1,7 +1,7 @@
 """Remove private objects before deleting their owning database records."""
 from django.db import transaction
 from photos.models import Photo
-from photos.services import storage
+from photos.services import object_keys, storage
 from django.conf import settings
 
 def delete_with_photos(instance, photo_scope):
@@ -9,6 +9,7 @@ def delete_with_photos(instance, photo_scope):
     if photos:
         client = storage()
         for photo in photos:
-            client.delete_object(Bucket=settings.MINIO_BUCKET, Key=photo.object_key)
+            for key in object_keys(photo):
+                client.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
     with transaction.atomic():
         instance.delete()
