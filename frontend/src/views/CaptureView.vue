@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
-import { Amphora, Camera, ImagePlus, MapPin, Play, X } from 'lucide-vue-next'
+import { Amphora, Camera, ImagePlus, MapPin, Play, Video, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { isoDate } from '@/format.js'
 import { state, navigate, run, load, toast } from '@/store.js'
@@ -122,7 +122,9 @@ function save() {
         <div v-else class="photo-empty">
           <Camera :size="40" />
           <div class="photo-buttons">
-            <label class="btn primary small"><Camera :size="16" /> Chụp / quay<input type="file" accept="image/*,video/*" capture="environment" @change="pick" /></label>
+            <!-- One kind per camera input: with accept="image/*,video/*" Android ignores capture and opens the file picker. -->
+            <label class="btn primary small"><Camera :size="16" /> Chụp ảnh<input type="file" accept="image/*" capture="environment" @change="pick" /></label>
+            <label class="btn outline small"><Video :size="16" /> Quay video<input type="file" accept="video/*" capture="environment" @change="pick" /></label>
             <label class="btn outline small"><ImagePlus :size="16" /> Thư viện<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" multiple @change="pick" /></label>
           </div>
           <small>Ảnh JPEG, PNG, WebP, HEIC · tối đa 80 MB<br />Video MP4, MOV, WebM · tối đa 200 MB</small>
@@ -137,7 +139,8 @@ function save() {
           <button type="button" class="thumb-remove" :aria-label="p.video ? 'Bỏ video' : 'Bỏ ảnh'" @click="drop(i)"><X :size="12" /></button>
         </span>
         <label class="thumb-add" aria-label="Thêm ảnh hoặc video từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" multiple @change="pick" /></label>
-        <label class="thumb-add" aria-label="Chụp thêm ảnh hoặc quay video"><Camera :size="20" /><input type="file" accept="image/*,video/*" capture="environment" @change="pick" /></label>
+        <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" @change="pick" /></label>
+        <label class="thumb-add" aria-label="Quay thêm video"><Video :size="20" /><input type="file" accept="video/*" capture="environment" @change="pick" /></label>
       </div>
       <PhotoViewer v-if="viewing && images.length" :urls="images.map(p => p.url)" :start="Math.max(0, images.indexOf(photos[current]))" @close="viewing = false" />
 

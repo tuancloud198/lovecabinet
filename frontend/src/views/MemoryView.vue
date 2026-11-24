@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Camera, Heart, ImagePlus, MapPin, Pencil, Play, Send, Trash2, X } from 'lucide-vue-next'
+import { Camera, Heart, ImagePlus, MapPin, Pencil, Play, Send, Trash2, Video, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
 import { appendLocation, hasLocation, namePlaces, photoLocation, placeGroups } from '@/location.js'
@@ -131,7 +131,8 @@ function remove() {
         <button type="button" class="thumb-remove" :aria-label="isVideo(p) ? 'Xóa video' : 'Xóa ảnh'" :disabled="state.busy" @click="removePhoto(p)"><X :size="12" /></button>
       </span>
       <label class="thumb-add" aria-label="Thêm ảnh hoặc video từ thư viện"><ImagePlus :size="20" /><input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" multiple :disabled="state.busy" @change="addPhotos" /></label>
-      <label class="thumb-add" aria-label="Chụp thêm ảnh hoặc quay video"><Camera :size="20" /><input type="file" accept="image/*,video/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
+      <label class="thumb-add" aria-label="Chụp thêm ảnh"><Camera :size="20" /><input type="file" accept="image/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
+      <label class="thumb-add" aria-label="Quay thêm video"><Video :size="20" /><input type="file" accept="video/*" capture="environment" :disabled="state.busy" @change="addPhotos" /></label>
     </div>
     <UploadProgress v-if="state.busy && progress" v-bind="progress" />
     <PhotoViewer v-if="viewing && images.length" :urls="images.map(p => p.url)" :start="Math.max(0, images.indexOf(item))" private @close="viewing = false" />

@@ -261,7 +261,7 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .photo-placeholder { font-size: 28px; opacity: .5; }
 .photo-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--primary); border: 2px dashed var(--primary-border); border-radius: var(--r-2xl); inset: 0; position: absolute; justify-content: center; }
 .photo-empty small { color: var(--muted); }
-.photo-buttons { display: flex; gap: 8px; }
+.photo-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .photo-buttons label { cursor: pointer; }
 .thumb-strip { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; }
 .thumb-strip button, .thumb-wrap { width: 56px; height: 56px; flex-shrink: 0; border-radius: var(--r-m); overflow: hidden; border: 2px solid transparent; position: relative; }
