@@ -1,7 +1,7 @@
 <script setup>
 import { computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { X } from 'lucide-vue-next'
-import { state, navigate, run, load, refresh } from '@/store.js'
+import { state, navigate, run, load, refresh, toast } from '@/store.js'
 import BottomNav from '@/components/BottomNav.vue'
 import PreviewBar from '@/components/PreviewBar.vue'
 import CabinetView from '@/views/CabinetView.vue'
@@ -48,6 +48,8 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibil
       <main :class="{ 'with-nav': showNav }">
         <component :is="views[state.view.name]" :key="viewKey" v-bind="state.view.params" />
       </main>
+      <!-- Look-only while trying a shop item: the page can't be tapped (scrolling still works). -->
+      <div v-if="state.preview" class="look-only" aria-hidden="true" @click="toast('Đang xem thử: chỉ xem thôi nhé')"></div>
       <PreviewBar v-if="state.preview" />
       <BottomNav v-if="showNav" :active="state.view.name" @go="navigate" />
     </template>

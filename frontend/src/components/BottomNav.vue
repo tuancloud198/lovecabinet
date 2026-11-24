@@ -18,7 +18,7 @@ const quizWaiting = computed(() => state.quiz.some(q => q.author !== state.me?.i
 </script>
 
 <template>
-  <nav class="bottom-nav" :class="{ locked: state.preview }" aria-label="Điều hướng chính">
+  <nav class="bottom-nav" aria-label="Điều hướng chính">
     <button v-for="tab in tabs" :key="tab.name" :class="{ active: active === tab.name, center: tab.center }" :aria-current="active === tab.name ? 'page' : undefined" @click="$emit('go', tab.name)">
       <span class="nav-icon"><component :is="tab.icon" :size="tab.center ? 26 : 22" /><span v-if="tab.name === 'quiz' && quizWaiting" class="nav-dot" aria-label="Có câu đố mới"></span></span>
       <span v-if="!tab.center" class="nav-label">{{ tab.label }}</span>

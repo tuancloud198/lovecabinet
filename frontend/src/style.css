@@ -612,6 +612,9 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .preview-text strong { font-size: 13px; }
 .preview-text small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page:has(~ .preview-bar), main:has(~ .preview-bar) .page { padding-bottom: 96px; }
-.bottom-nav.locked button { opacity: .45; }
 .preview-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .phone:has(.preview-bar) .toast { bottom: calc(var(--nav-height) + 92px); } /* above the preview bar */
+/* Look-only preview: a clear layer over the page (below the preview bar and nav) catches taps; the page
+   still scrolls underneath because the layer only covers the viewport, not the document. */
+.look-only { position: fixed; inset: 0; z-index: 9; touch-action: pan-y; }
+.phone:has(.preview-bar) .fab { display: none; } /* it would sit under the bar (and can't be used while looking) */
