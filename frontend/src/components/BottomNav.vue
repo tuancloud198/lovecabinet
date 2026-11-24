@@ -1,15 +1,16 @@
 <script setup>
 import { computed } from 'vue'
-import { CalendarDays, Amphora, Camera, Dog, Puzzle, UserRound } from 'lucide-vue-next'
+import { CalendarDays, Amphora, Camera, Dog, Puzzle, ShoppingBag, UserRound } from 'lucide-vue-next'
 import { state } from '@/store.js'
 defineProps({ active: String })
 defineEmits(['go'])
 const tabs = [
   { name: 'calendar', label: 'Lịch', icon: CalendarDays },
   { name: 'cabinet', label: 'Tủ', icon: Amphora },
-  { name: 'capture', label: 'Camera', icon: Camera, center: true },
   { name: 'quiz', label: 'Đố vui', icon: Puzzle },
+  { name: 'capture', label: 'Camera', icon: Camera, center: true }, // the middle of 7
   { name: 'pet', label: 'Nhân Vật', icon: Dog },
+  { name: 'shop', label: 'Cửa hàng', icon: ShoppingBag },
   { name: 'profile', label: 'Hồ Sơ', icon: UserRound },
 ]
 // Đố vui gets a dot while the partner has questions waiting for me.

@@ -16,6 +16,8 @@ export const state = reactive({
   quiz: [],
   /** Shop points ({ earned, spent, balance }) and items ({ id, kind, name, price, owned }). */
   shop: null,
+  /** A shop item being tried (not bought, not saved): { item, theme }. */
+  preview: null,
   invites: emptyInvites(),
   busy: false,
   error: '',
@@ -110,7 +112,7 @@ export async function signIn(token) {
 function signOutLocally() {
   setToken('')
   clearPhotos()
-  Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], quiz: [], shop: null, invites: emptyInvites(), onboarding: '', justPaired: false, view: { name: 'cabinet', params: {} } })
+  Object.assign(state, { token: '', me: null, couple: null, cabinets: [], jars: [], memories: [], events: [], quiz: [], shop: null, preview: null, invites: emptyInvites(), onboarding: '', justPaired: false, view: { name: 'cabinet', params: {} } })
 }
 
 // Signing out (or in as someone else) in another tab applies here too.

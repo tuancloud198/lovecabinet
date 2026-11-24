@@ -7,14 +7,12 @@ import { state, navigate, run, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import PetArt from '@/components/PetArt.vue'
-import ShopPanel from '@/components/ShopPanel.vue'
 
 const pet = computed(() => petStatus(state.memories, state.couple.pet_points || 0))
 const name = computed(() => state.couple.pet_name)
 const remaining = computed(() => pet.value.target - pet.value.count)
 
 const editing = ref(false)
-const tab = ref('pet') // pet | shop
 const form = ref({})
 function startEdit() {
   form.value = { pet_name: name.value }
@@ -36,12 +34,6 @@ function save() {
     <AppHeader title="Nhân vật của chúng ta">
       <button class="icon-button" aria-label="Đổi tên và loài thú cưng" @click="startEdit"><Pencil :size="20" /></button>
     </AppHeader>
-    <div class="segmented pet-tabs" role="tablist">
-      <button role="tab" :aria-selected="tab === 'pet'" :class="{ active: tab === 'pet' }" @click="tab = 'pet'">Bạn nhỏ</button>
-      <button role="tab" :aria-selected="tab === 'shop'" :class="{ active: tab === 'shop' }" @click="tab = 'shop'">Cửa hàng · {{ state.shop?.balance ?? 0 }} điểm</button>
-    </div>
-    <ShopPanel v-if="tab === 'shop'" />
-    <template v-else>
     <div class="pet-stage">
       <span class="float-heart one">♡</span><span class="float-heart two">♡</span>
       <PetArt :stage="pet.stageIndex" :mood="pet.mood.face" :aria-label="`${name}, giai đoạn ${stageLabel(pet.stageIndex)}`" role="img" />
@@ -71,7 +63,6 @@ function save() {
         <ArrowRight v-if="i < STAGES.length - 1" :size="16" class="stage-arrow" aria-hidden="true" />
       </template>
     </ol>
-    </template>
 
     <BottomSheet v-if="editing" title="Bạn nhỏ của chúng ta ♡" @close="editing = false">
       <form class="stack" @submit.prevent="save">

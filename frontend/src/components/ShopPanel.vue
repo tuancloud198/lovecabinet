@@ -1,11 +1,11 @@
 <script setup>
 // Cửa hàng: spend the couple's points (the same points the pet grows with) on items. Spending only
 // lowers the shop balance; the pet keeps every point it earned. Items are shared by the couple;
-// each partner picks their own theme.
+// each partner picks their own theme. Every item can be tried first ("Xem thử").
 import { computed } from 'vue'
-import { Check, Lock, ShoppingBag } from 'lucide-vue-next'
-import { api } from '@/api.js'
-import { state, run, toast } from '@/store.js'
+import { Check, Eye, Lock, ShoppingBag } from 'lucide-vue-next'
+import { applyTheme as apply, buy, startPreview, stopPreview, themeOf } from '@/shop.js'
+import { state } from '@/store.js'
 
 // Colours shown on each theme's card (its primary, light, page and wood colours).
 const SWATCHES = {
@@ -13,26 +13,9 @@ const SWATCHES = {
   pink: ['#C94F7C', '#FCE4EE', '#F9E1EA', '#F2C1D1'],
 }
 const shop = computed(() => state.shop || { earned: 0, spent: 0, balance: 0, items: [] })
-const themeOf = item => item.id.replace(/^theme_/, '')
 const myTheme = computed(() => state.me.theme || '')
 const pet = computed(() => state.couple.pet_name)
-
-function buy(item) {
-  if (!window.confirm(`Mua "${item.name}" với ${item.price} điểm?`)) return
-  run(async () => {
-    state.shop = await api(`shop/${item.id}/buy/`, { method: 'POST' })
-    toast(`Đã mua "${item.name}"! ♡`)
-    if (item.kind === 'theme') await useTheme(themeOf(item))
-  })
-}
-async function useTheme(theme) {
-  state.me = await api('users/me/', { method: 'PATCH', body: { theme } })
-  const member = state.couple.members.find(m => m.id === state.me.id)
-  if (member) Object.assign(member, state.me)
-}
-function apply(theme) {
-  run(async () => { await useTheme(theme); toast(theme ? 'Đã đổi giao diện!' : 'Đã dùng giao diện mặc định.') })
-}
+const previewing = item => state.preview?.item.id === item.id
 </script>
 
 <template>
@@ -55,6 +38,8 @@ function apply(theme) {
       <div v-for="item in shop.items.filter(i => i.kind === 'theme')" :key="item.id" class="shop-item card" :class="{ active: myTheme === themeOf(item) }">
         <span class="theme-swatches"><i v-for="c in SWATCHES[themeOf(item)] || []" :key="c" :style="{ background: c }"></i></span>
         <strong>{{ item.name }}</strong><small class="muted">{{ item.description }}</small>
+        <button v-if="!item.owned && !previewing(item)" class="btn outline small block" @click="startPreview(item)"><Eye :size="16" /> Xem thử</button>
+        <button v-if="!item.owned && previewing(item)" class="btn tertiary small block" @click="stopPreview"><Eye :size="16" /> Đang xem thử · thoát</button>
         <button v-if="!item.owned" class="btn primary small block" :disabled="state.busy || shop.balance < item.price" @click="buy(item)">Mua · {{ item.price }} điểm</button>
         <button v-else class="btn small block" :class="myTheme === themeOf(item) ? 'tertiary' : 'outline'" :disabled="state.busy || myTheme === themeOf(item)" @click="apply(themeOf(item))">
           <template v-if="myTheme === themeOf(item)"><Check :size="16" /> Đang dùng</template><template v-else>Dùng</template>

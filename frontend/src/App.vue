@@ -3,6 +3,7 @@ import { computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { X } from 'lucide-vue-next'
 import { state, navigate, run, load, refresh } from '@/store.js'
 import BottomNav from '@/components/BottomNav.vue'
+import PreviewBar from '@/components/PreviewBar.vue'
 import CabinetView from '@/views/CabinetView.vue'
 import CalendarView from '@/views/CalendarView.vue'
 import CaptureView from '@/views/CaptureView.vue'
@@ -14,15 +15,16 @@ import PetView from '@/views/PetView.vue'
 import ProfileSetupView from '@/views/ProfileSetupView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import QuizView from '@/views/QuizView.vue'
+import ShopView from '@/views/ShopView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
 
-const views = { cabinet: CabinetView, calendar: CalendarView, capture: CaptureView, jar: JarView, map: MapView, memory: MemoryView, pet: PetView, profile: ProfileView, quiz: QuizView }
-const TABS = ['calendar', 'cabinet', 'quiz', 'pet', 'profile']
+const views = { cabinet: CabinetView, calendar: CalendarView, capture: CaptureView, jar: JarView, map: MapView, memory: MemoryView, pet: PetView, profile: ProfileView, quiz: QuizView, shop: ShopView }
+const TABS = ['calendar', 'cabinet', 'quiz', 'pet', 'shop', 'profile']
 const showNav = computed(() => TABS.includes(state.view.name))
 const viewKey = computed(() => state.view.name + JSON.stringify(state.view.params))
 
-// Each partner's own look (a theme bought in the shop): <html data-theme="pink">.
-watch(() => state.me?.theme, theme => {
+// Each partner's own look (a theme bought in the shop, or one being tried): <html data-theme="pink">.
+watch(() => (state.preview ? state.preview.theme : state.me?.theme), theme => {
   if (theme) document.documentElement.dataset.theme = theme
   else delete document.documentElement.dataset.theme
 }, { immediate: true })
@@ -46,6 +48,7 @@ onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibil
       <main :class="{ 'with-nav': showNav }">
         <component :is="views[state.view.name]" :key="viewKey" v-bind="state.view.params" />
       </main>
+      <PreviewBar v-if="state.preview" />
       <BottomNav v-if="showNav" :active="state.view.name" @go="navigate" />
     </template>
 
