@@ -560,7 +560,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .battle-row dd.win { font-weight: 800; }
 .battle-row dd.me.win { background: var(--primary-light); color: var(--primary-strong); }
 .battle-row dd.them.win { background: var(--secondary-light); color: color-mix(in srgb, var(--secondary) 80%, var(--text)); }
-.battle-row dd.win::after { content: ' ♥'; font-size: 11px; vertical-align: 2px; }
 .battle-bar { position: relative; height: 40px; margin: 6px 4px 4px; display: flex; align-items: center; }
 .battle-bar-track { position: relative; width: 100%; height: 14px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--secondary) 38%, var(--secondary-light)); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-soft); }
 .battle-bar-me { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--fill-start) 70%, var(--primary-light)); transition: width .4s; }
