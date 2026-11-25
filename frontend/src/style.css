@@ -676,7 +676,7 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .mood-picker button.chosen { border: 2px solid var(--primary); background: var(--primary-light); color: var(--primary); }
 
 /* Today's points towards the daily limit (DailyPoints.vue, on Tủ and Đố vui) */
-.daily-points { margin: 0 0 12px; padding: 10px 12px; border-radius: var(--r-l); background: var(--surface); border: 1px solid var(--border-soft); box-shadow: var(--shadow); }
+.daily-points { margin: 12px 0; padding: 10px 12px; border-radius: var(--r-l); background: var(--surface); border: 1px solid var(--border-soft); box-shadow: var(--shadow); }
 .daily-points-head { display: flex; align-items: center; gap: 10px; }
 .daily-points-icon { display: inline-flex; width: 30px; height: 30px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; background: var(--primary-light); color: var(--primary); }
 .daily-points-text { display: flex; flex-direction: column; line-height: 1.3; }
