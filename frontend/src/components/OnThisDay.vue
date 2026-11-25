@@ -8,6 +8,7 @@ import { coverPhoto, thumbOf } from '@/photos.js'
 import { state, navigate } from '@/store.js'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
 import ReplayPlayer from '@/components/ReplayPlayer.vue'
+import EmojiIcon from '@/components/EmojiIcon.vue'
 
 const now = new Date()
 const [y, m, d] = [now.getFullYear(), now.getMonth(), now.getDate()]
@@ -49,7 +50,7 @@ const replaying = ref(false)
         <button v-for="memory in g.memories" :key="memory.id" class="on-this-day-item" @click="navigate('memory', { id: memory.id })">
           <span class="on-this-day-thumb">
             <PrivatePhoto v-if="coverPhoto(memory)" :url="thumbOf(coverPhoto(memory))" alt="" />
-            <span v-else>{{ memory.emoji }}</span>
+            <span v-else><EmojiIcon :emoji="memory.emoji" /></span>
           </span>
           <span class="on-this-day-title">{{ memory.title }}</span>
         </button>

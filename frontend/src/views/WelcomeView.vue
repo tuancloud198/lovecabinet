@@ -42,7 +42,7 @@ function googleSignIn(credential) {
     </div>
     <div class="slide" @click="slide = (slide + 1) % slides.length">
       <div class="slide-art">
-        <div v-if="slides[slide].jars" class="mini-shelf"><JarArt color="#F6C9C4" :emojis="['❤️', '🍰', '☕', '🎂']" /><JarArt color="#BFD7EA" :emojis="['⛰️', '🌲', '📷']" /></div>
+        <div v-if="slides[slide].jars" class="mini-shelf"><JarArt color="#F6C9C4" :emojis="['❤️', '🍮', '☕', '🎂']" /><JarArt color="#BFD7EA" :emojis="['✈️', '🌲', '📷']" /></div>
         <img v-else :src="art[slides[slide].image]" alt="" />
       </div>
       <h2>{{ slides[slide].title }} <span class="heart">♡</span></h2>

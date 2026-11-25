@@ -3,13 +3,15 @@
 // gets one card), in date order. Photos stay PHOTO_MS, videos play to the end. Each slide shows its
 // memory's title, date, author and description on top. Tap left/right = previous/next, middle (or
 // space) = pause; arrow keys and Esc work too.
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Pause, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-vue-next'
 import { displayDate } from '@/format.js'
 import { displayOf, isVideo, mediaOf, preload } from '@/photos.js'
 import { state } from '@/store.js'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
+import EmojiIcon from '@/components/EmojiIcon.vue'
+import PetLoader from '@/components/PetLoader.vue'
 
 const props = defineProps({
   memories: { type: Array, required: true },
@@ -39,6 +41,7 @@ const paused = ref(false)
 const muted = ref(false)
 const progress = ref(0) // of the current slide, 0..1
 const video = ref(null)
+const videoReady = reactive({}) // photo id -> true once it can show a frame (the pet shows until then)
 const member = id => state.couple?.members.find(m => m.id === id)
 const barWidth = k => (k < slide.value.i ? 100 : k === slide.value.i ? progress.value * 100 : 0)
 
@@ -149,9 +152,10 @@ onBeforeUnmount(() => {
     <template v-else-if="!finished">
       <div class="replay-stage" @click="tap">
         <video v-if="isVideo(slide.item)" ref="video" :key="slide.item.id" :src="slide.item.stream_url" playsinline preload="auto"
-               @timeupdate="onVideoTime" @ended="next"></video>
+               @timeupdate="onVideoTime" @ended="next" @loadeddata="videoReady[slide.item.id] = true" @playing="videoReady[slide.item.id] = true"></video>
+        <PetLoader v-if="isVideo(slide.item) && !videoReady[slide.item.id]" class="media-loading" />
         <PrivatePhoto v-else-if="slide.item" :key="slide.item.id" :url="displayOf(slide.item)" />
-        <div v-else class="replay-card"><span>{{ slide.memory.emoji }}</span></div>
+        <div v-else class="replay-card"><EmojiIcon :emoji="slide.memory.emoji" /></div>
       </div>
 
       <!-- The memory's details, above every photo/video -->
@@ -162,7 +166,7 @@ onBeforeUnmount(() => {
         <div class="replay-head">
           <CharacterAvatar :user="member(slide.memory.author)" :size="36" />
           <div class="replay-meta">
-            <strong>{{ slide.memory.emoji }} {{ slide.memory.title }}</strong>
+            <strong><EmojiIcon :emoji="slide.memory.emoji" /> {{ slide.memory.title }}</strong>
             <small>{{ displayDate(slide.memory.date) }} · {{ slide.memory.author_name }} · {{ slide.m + 1 }}/{{ ordered.length }}</small>
           </div>
           <button class="replay-button" aria-label="Đóng" @click="emit('close')"><X :size="22" /></button>

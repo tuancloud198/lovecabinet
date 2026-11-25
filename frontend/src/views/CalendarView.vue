@@ -12,6 +12,7 @@ import PrivatePhoto from '@/components/PrivatePhoto.vue'
 import ReplayPlayer from '@/components/ReplayPlayer.vue'
 import ReplayRangeSheet from '@/components/ReplayRangeSheet.vue'
 import { coverPhoto, thumbOf } from '@/photos.js'
+import EmojiIcon from '@/components/EmojiIcon.vue'
 
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
 const today = isoDate()
@@ -107,7 +108,7 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
       <p v-if="!upcoming.length" class="muted">Chưa có sự kiện sắp tới. Lên lịch một buổi hẹn nhé!</p>
       <div v-for="e in upcoming" :key="e.key || e.id" class="event-row card" :class="{ anniversary: e.anniversary }">
         <span class="date-chip">{{ shortDate(e.date) }}</span>
-        <span class="row-text"><strong>{{ e.title }} {{ e.emoji }}</strong></span>
+        <span class="row-text"><strong>{{ e.title }} <EmojiIcon :emoji="e.emoji" /></strong></span>
         <span class="chip green">{{ countdown(e.date) }}</span>
         <button v-if="!e.anniversary" class="icon-button" :aria-label="`Xóa ${e.title}`" @click="removeEvent(e)"><X :size="16" /></button>
       </div>
@@ -117,16 +118,16 @@ const countdown = d => { const n = daysUntil(d); return n === 0 ? 'Hôm nay' : `
 
     <BottomSheet v-if="day" :title="displayDate(day)" @close="day = null">
       <div class="stack">
-        <div v-for="a in dayAnniversaries" :key="a.key" class="event-row card anniversary"><span class="row-text"><strong>{{ a.title }} {{ a.emoji }}</strong></span></div>
+        <div v-for="a in dayAnniversaries" :key="a.key" class="event-row card anniversary"><span class="row-text"><strong>{{ a.title }} <EmojiIcon :emoji="a.emoji" /></strong></span></div>
         <div v-for="e in dayEvents" :key="e.id" class="event-row card">
-          <span class="row-text"><strong>{{ e.title }} {{ e.emoji }}</strong></span>
+          <span class="row-text"><strong>{{ e.title }} <EmojiIcon :emoji="e.emoji" /></strong></span>
           <button class="icon-button" :aria-label="`Xóa ${e.title}`" @click="removeEvent(e)"><X :size="16" /></button>
         </div>
         <p v-if="!dayMemories.length" class="muted">Chưa có kỷ niệm nào vào ngày này.</p>
         <div v-else>
           <button v-for="m in dayMemories" :key="m.id" class="memory-row card" @click="navigate('memory', { id: m.id })">
-            <span class="thumb"><PrivatePhoto v-if="coverPhoto(m)" :url="thumbOf(coverPhoto(m))" /><span v-else>{{ m.photos.length ? '🎬' : m.emoji }}</span></span>
-            <span class="row-text"><small class="date">{{ m.emoji }} {{ m.author_name }}</small><strong>{{ m.title }}</strong><small class="clamp">{{ m.story }}</small></span>
+            <span class="thumb"><PrivatePhoto v-if="coverPhoto(m)" :url="thumbOf(coverPhoto(m))" /><EmojiIcon v-else :emoji="m.photos.length ? '🎬' : m.emoji" /></span>
+            <span class="row-text"><small class="date"><EmojiIcon :emoji="m.emoji" /> {{ m.author_name }}</small><strong>{{ m.title }}</strong><small class="clamp">{{ m.story }}</small></span>
             <ChevronRight :size="20" />
           </button>
         </div>

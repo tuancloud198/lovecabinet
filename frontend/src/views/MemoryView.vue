@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { Camera, Heart, ImagePlus, MapPin, Pencil, Play, Send, Trash2, Video, X } from 'lucide-vue-next'
 import { api, upload } from '@/api.js'
 import { displayDate, timeAgo } from '@/format.js'
@@ -13,6 +13,8 @@ import MiniMap from '@/components/MiniMap.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import PrivatePhoto from '@/components/PrivatePhoto.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
+import EmojiIcon from '@/components/EmojiIcon.vue'
+import PetLoader from '@/components/PetLoader.vue'
 
 const props = defineProps({ id: Number })
 const memory = computed(() => state.memories.find(m => m.id === props.id))
@@ -27,6 +29,7 @@ watch(current, i => {
 // The full-screen viewer shows photos only; videos play in place with their own controls.
 const images = computed(() => media.value.filter(p => !isVideo(p)))
 const viewing = ref(false)
+const videoState = reactive({}) // photo id -> 'ready' | 'failed'; the pet shows until a video is ready
 const progress = ref(null) // { done, total, part } while adding photos
 const comment = ref('')
 const member = id => state.couple.members.find(m => m.id === id)
@@ -114,18 +117,20 @@ function remove() {
     </AppHeader>
     <div class="photo-frame">
       <template v-if="item">
-        <video v-if="isVideo(item)" :key="item.id" class="photo-video" :src="item.stream_url" controls playsinline preload="metadata"></video>
+        <video v-if="isVideo(item)" :key="item.id" class="photo-video" :src="item.stream_url" controls playsinline preload="metadata"
+               @loadedmetadata="videoState[item.id] = 'ready'" @error="videoState[item.id] = 'failed'"></video>
         <button v-else type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
           <PrivatePhoto :key="item.id" :url="displayOf(item)" />
         </button>
+        <PetLoader v-if="isVideo(item) && videoState[item.id] !== 'ready'" class="media-loading" :still="videoState[item.id] === 'failed'" />
         <button type="button" class="photo-delete" :aria-label="isVideo(item) ? 'Xóa video này' : 'Xóa ảnh này'" :disabled="state.busy" @click="removePhoto(item)"><Trash2 :size="18" /></button>
       </template>
-      <span v-else class="photo-emoji">{{ memory.emoji }}</span>
+      <span v-else class="photo-emoji"><EmojiIcon :emoji="memory.emoji" /></span>
     </div>
     <div class="thumb-strip">
       <span v-for="(p, i) in media" :key="p.id" class="thumb-wrap" :class="{ chosen: current === i }">
         <button type="button" :aria-label="isVideo(p) ? `Video ${i + 1}` : `Ảnh ${i + 1}`" @click="photo = i">
-          <span v-if="isVideo(p)" class="thumb-video"><video :src="`${p.stream_url}#t=0.1`" muted playsinline preload="metadata"></video><Play :size="16" fill="currentColor" /></span>
+          <span v-if="isVideo(p)" class="thumb-video"><video :src="`${p.stream_url}#t=0.1`" muted playsinline preload="metadata" @loadeddata="videoState[`t${p.id}`] = 'ready'" @error="videoState[`t${p.id}`] = 'failed'"></video><PetLoader v-if="videoState[`t${p.id}`] !== 'ready'" class="media-loading" :still="videoState[`t${p.id}`] === 'failed'" /><Play :size="16" fill="currentColor" /></span>
           <PrivatePhoto v-else :url="thumbOf(p)" alt="" />
         </button>
         <button type="button" class="thumb-remove" :aria-label="isVideo(p) ? 'Xóa video' : 'Xóa ảnh'" :disabled="state.busy" @click="removePhoto(p)"><X :size="12" /></button>
@@ -137,7 +142,7 @@ function remove() {
     <UploadProgress v-if="state.busy && progress" v-bind="progress" />
     <PhotoViewer v-if="viewing && images.length" :urls="images.map(p => p.url)" :start="Math.max(0, images.indexOf(item))" private @close="viewing = false" />
     <section class="sheet-section">
-      <h2 class="memory-title">{{ memory.emoji }} {{ memory.title }}</h2>
+      <h2 class="memory-title"><EmojiIcon :emoji="memory.emoji" /> {{ memory.title }}</h2>
       <p class="muted">{{ memory.author_name }} · {{ timeAgo(memory.created_at) }}</p>
       <p v-if="memory.story" class="story">{{ memory.story }}</p>
       <div v-if="places.length" class="location-card">

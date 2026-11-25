@@ -13,6 +13,7 @@ import { state, navigate } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ReplayPlayer from '@/components/ReplayPlayer.vue'
+import EmojiIcon from '@/components/EmojiIcon.vue'
 
 const props = defineProps({ focus: Number }) // a memory to center on (from its page)
 const jar = ref(null) // filter: null = every jar
@@ -127,7 +128,7 @@ const back = () => (props.focus ? navigate('memory', { id: props.focus }) : navi
     <AppHeader title="Bản đồ kỷ niệm" back @back="back" />
     <div v-if="jars.length > 1" class="chips map-filter">
       <button class="chip" :class="jar == null ? 'chosen' : 'soft'" @click="jar = null">Tất cả</button>
-      <button v-for="j in jars" :key="j.id" class="chip" :class="jar === j.id ? 'chosen' : 'soft'" @click="jar = j.id">{{ j.emoji }} {{ j.name }}</button>
+      <button v-for="j in jars" :key="j.id" class="chip" :class="jar === j.id ? 'chosen' : 'soft'" @click="jar = j.id"><EmojiIcon :emoji="j.emoji" /> {{ j.name }}</button>
     </div>
 
     <div ref="element" class="map full-map" aria-label="Bản đồ kỷ niệm"></div>
@@ -141,7 +142,7 @@ const back = () => (props.focus ? navigate('memory', { id: props.focus }) : navi
         <button v-if="selected.zoom" class="btn outline block" @click="zoomIn"><ZoomIn :size="18" /> Phóng to</button>
       </div>
       <button v-for="m in selected.memories" :key="m.id" class="notification" @click="open(m)">
-        <span class="row-icon">{{ m.emoji }}</span>
+        <span class="row-icon"><EmojiIcon :emoji="m.emoji" /></span>
         <span class="row-text">
           <strong>{{ m.title }}</strong>
           <small>{{ displayDate(m.date) }}<template v-if="selected.itemsHere[m.id]"> · {{ selected.itemsHere[m.id] }}/{{ m.photos.length }} ảnh/video ở đây</template></small>

@@ -12,6 +12,7 @@ import UploadProgress from '@/components/UploadProgress.vue'
 import LocationPicker from '@/components/LocationPicker.vue'
 import { appendLocation, namePlaces, photoLocation, placeName } from '@/location.js'
 import { isVideoFile, uploadablePhoto } from '@/photos.js'
+import PetLoader from '@/components/PetLoader.vue'
 
 const props = defineProps({ jarId: Number })
 const jars = computed(() => [...state.jars].sort((a, b) => b.id - a.id))
@@ -117,7 +118,7 @@ function save() {
         <video v-if="photos.length && photos[current].video" :key="photos[current].url" class="photo-video" :src="photos[current].url" controls playsinline preload="metadata"></video>
         <button v-else-if="photos.length" type="button" class="photo-open" aria-label="Xem ảnh toàn màn hình" @click="viewing = true">
           <img v-if="!photos[current].noPreview" :src="photos[current].url" alt="Ảnh đã chọn" @error="photos[current].noPreview = true" />
-          <span v-else class="photo-placeholder">📷</span> <!-- e.g. HEIC outside Safari: uploads fine, the server converts it -->
+          <PetLoader v-else still /> <!-- e.g. HEIC outside Safari: uploads fine, the server converts it -->
         </button>
         <div v-else class="photo-empty">
           <Camera :size="40" />
@@ -134,7 +135,7 @@ function save() {
         <span v-for="(p, i) in photos" :key="p.url" class="thumb-wrap" :class="{ chosen: current === i }">
           <button type="button" :aria-label="p.video ? `Video ${i + 1}` : `Ảnh ${i + 1}`" @click="current = i">
             <span v-if="p.video" class="thumb-video"><video :src="`${p.url}#t=0.1`" muted playsinline preload="metadata"></video><Play :size="16" fill="currentColor" /></span>
-            <img v-else-if="!p.noPreview" :src="p.url" alt="" @error="p.noPreview = true" /><span v-else class="photo-placeholder">📷</span>
+            <img v-else-if="!p.noPreview" :src="p.url" alt="" @error="p.noPreview = true" /><PetLoader v-else still />
           </button>
           <button type="button" class="thumb-remove" :aria-label="p.video ? 'Bỏ video' : 'Bỏ ảnh'" @click="drop(i)"><X :size="12" /></button>
         </span>

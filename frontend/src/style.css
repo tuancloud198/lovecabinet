@@ -114,6 +114,10 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .emoji-picker button { width: 42px; height: 42px; border-radius: var(--r-m); background: var(--surface); border: 1px solid var(--border-soft); font-size: 22px; display: inline-flex; align-items: center; justify-content: center; }
 .emoji-picker button.chosen { border: 2px solid var(--primary); background: var(--primary-light); }
 .emoji-picker .more { color: var(--muted); }
+.emoji-picker button .emoji-icon { font-size: 26px; }
+.emoji-icon { width: 1em; height: 1em; display: inline-block; vertical-align: -0.15em; object-fit: contain; flex-shrink: 0; }
+.emoji-text { width: auto; height: auto; line-height: 1; }
+.row-icon .emoji-icon { font-size: 24px; }
 
 /* Header */
 .app-header { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; padding: 16px 0 12px; }
@@ -223,9 +227,9 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .shelf-cell:nth-child(even)::after { right: -12px; }
 .shelf-cell .jar-art { width: 100%; max-width: 150px; transition: transform .15s; }
 .shelf-cell:hover .jar-art { transform: translateY(-3px); }
-.jar-label { display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: -6px; padding: 6px 8px; background: rgba(255, 250, 244, .92); border-radius: var(--r-m); box-shadow: 0 2px 6px rgba(98,66,35,.12); font-size: 13px; line-height: 1.3; }
+.jar-label { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 150px; margin-top: -8px; padding: 6px 8px; background: linear-gradient(180deg, #FFF7EC, #FCEBDA); border: 1.5px solid #EACFB6; border-radius: var(--r-l); box-shadow: 0 2px 6px rgba(98,66,35,.1); font-size: 13px; line-height: 1.3; }
 .jar-label small { color: var(--muted); font-size: 12px; }
-.new-jar-slot { width: 100%; max-width: 150px; aspect-ratio: 120 / 140; display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(117,103,94,.45); border-radius: 26px; color: var(--muted); background: rgba(255,255,255,.25); }
+.new-jar-slot { width: 100%; max-width: 150px; aspect-ratio: 120 / 136; display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(117,103,94,.45); border-radius: 26px; color: var(--muted); background: rgba(255,255,255,.25); }
 .cabinet-empty { padding-bottom: 16px; }
 .jar-preview { display: flex; justify-content: center; }
 .jar-preview .jar-art { width: 120px; }
@@ -233,18 +237,30 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .notification > small { white-space: nowrap; font-size: 11px; }
 
 /* Jar art */
-.jar-art { position: relative; width: 120px; aspect-ratio: 120 / 140; container-type: inline-size; }
+.jar-art { position: relative; width: 120px; aspect-ratio: 120 / 136; container-type: inline-size; }
 .jar-art svg { width: 100%; height: 100%; overflow: visible; }
-.jar-glass { fill: rgba(236, 246, 248, .5); stroke: #BFAE9E; stroke-width: 2.5; stroke-linejoin: round; }
-.jar-shine { fill: none; stroke: rgba(255, 255, 255, .95); stroke-width: 4; stroke-linecap: round; }
-.jar-cloth { fill: var(--jar-color); stroke: color-mix(in srgb, var(--jar-color) 65%, #7a4a3a); stroke-width: 1.5; stroke-linejoin: round; }
-.jar-cloth-fold { fill: none; stroke: color-mix(in srgb, var(--jar-color) 80%, #7a4a3a); stroke-width: 1.2; stroke-linecap: round; opacity: .6; }
-.jar-band { fill: color-mix(in srgb, var(--jar-color) 70%, #7a4a3a); }
-.jar-bow { fill: color-mix(in srgb, var(--jar-color) 80%, #fff); stroke: color-mix(in srgb, var(--jar-color) 55%, #7a4a3a); stroke-width: 1.6; stroke-linejoin: round; }
-.jar-knot { fill: color-mix(in srgb, var(--jar-color) 60%, #7a4a3a); }
-.jar-emojis { position: absolute; left: 14%; right: 14%; top: 42%; bottom: 7%; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 1cqw 4cqw; font-size: 17cqw; line-height: 1.15; }
+.jar-art svg path, .jar-art svg rect, .jar-art svg ellipse { stroke-linejoin: round; stroke-linecap: round; }
+.jar-glass { stroke: #C9B7A9; stroke-width: 4.2; filter: drop-shadow(0 2px 2px rgba(98, 66, 35, .12)); }
+.jar-rim { fill: none; stroke: rgba(255, 255, 255, .92); stroke-width: 1.8; }
+.jar-shine { fill: none; stroke: #fff; stroke-width: 3.6; opacity: .95; }
+.jar-shine.thin { stroke-width: 2.2; opacity: .8; }
+.jar-lid-side { fill: #E2B37C; stroke: #B5824F; stroke-width: 1.4; }
+.jar-lid-top { fill: #F3D7AC; stroke: #B5824F; stroke-width: 1.4; }
+.jar-lid-grain { fill: none; stroke: #C08C58; stroke-width: .9; opacity: .7; }
+.jar-lid-grain.top { stroke: #DCB583; opacity: .9; }
+.jar-art { --ribbon: var(--jar-color); --ribbon-line: color-mix(in oklch, var(--jar-color) 70%, #000); }
+@supports (color: oklch(from red l c h)) {
+  .jar-art { --ribbon: oklch(from var(--jar-color) calc(l - .04) calc(c * 1.7) h); --ribbon-line: oklch(from var(--jar-color) calc(l - .2) calc(c * 2) h); }
+}
+.jar-ribbon { fill: var(--ribbon); stroke: var(--ribbon-line); stroke-width: 1.2; }
+.jar-ribbon-shine { fill: none; stroke: #fff; stroke-width: 1.6; opacity: .55; }
+.jar-ribbon-fold { fill: none; stroke: var(--ribbon-line); stroke-width: .9; opacity: .6; }
+.jar-knot { fill: var(--ribbon); stroke: var(--ribbon-line); stroke-width: 1.2; }
+.jar-emojis { position: absolute; left: 5%; right: 5%; top: 42%; bottom: 5%; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 3cqw; }
+.jar-bubble { width: 27cqw; height: 27cqw; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #fff 60%, #F8F3EF); box-shadow: 0 .8cqw 1.6cqw rgba(98, 66, 35, .13); font-size: 19cqw; line-height: 1; }
+.jar-bubble:only-child { width: 34cqw; height: 34cqw; font-size: 24cqw; }
+.jar-bubble .emoji-icon { vertical-align: 0; }
 .jar-art.large { width: 230px; }
-.jar-art.large .jar-emojis { font-size: 15cqw; }
 .jar-stage { display: flex; justify-content: center; padding: 20px 0 8px; margin: 0 -16px; background: radial-gradient(ellipse at 50% 100%, var(--stage-ground) 0 40%, transparent 41%), linear-gradient(180deg, var(--secondary-light), var(--bg)); }
 
 /* Memory list & detail */
@@ -258,7 +274,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 /* contain, not cover: show the whole photo, letterboxed inside the frame */
 .photo-open img { width: 100%; height: 100%; object-fit: contain; }
 .photo-emoji { font-size: 96px; }
-.photo-placeholder { font-size: 28px; opacity: .5; }
 .photo-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--primary); border: 2px dashed var(--primary-border); border-radius: var(--r-2xl); inset: 0; position: absolute; justify-content: center; }
 .photo-empty small { color: var(--muted); }
 .photo-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -343,7 +358,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 /* Full-screen photo viewer */
 .viewer { position: fixed; inset: 0; z-index: 100; background: rgba(20, 14, 11, .94); display: flex; align-items: center; justify-content: center; padding: 56px 8px; touch-action: pan-y; }
 .viewer > img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.viewer .photo-placeholder { color: #fff; }
 .viewer-button { position: absolute; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; }
 .viewer-button:hover { background: rgba(255, 255, 255, .28); }
 .viewer-close { top: 12px; right: 12px; }
@@ -383,7 +397,6 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .replay { position: fixed; inset: 0; z-index: 120; background: #120d0b; color: #fff; display: flex; align-items: center; justify-content: center; }
 .replay-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .replay-stage img, .replay-stage video { width: 100%; height: 100%; object-fit: contain; }
-.replay-stage .photo-placeholder { color: #fff; }
 .replay-card { display: flex; align-items: center; justify-content: center; width: min(70vw, 320px); aspect-ratio: 1; border-radius: 32px; background: radial-gradient(circle at 50% 40%, #fff3e6, var(--primary-light)); font-size: 96px; }
 .replay-top { position: absolute; top: 0; left: 0; right: 0; padding: max(12px, env(safe-area-inset-top)) 14px 28px; background: linear-gradient(rgba(10, 6, 4, .78), rgba(10, 6, 4, .45) 70%, transparent); pointer-events: none; }
 .replay-top button { pointer-events: auto; }
@@ -616,3 +629,26 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
    still scrolls underneath because the layer only covers the viewport, not the document. */
 .look-only { position: fixed; inset: 0; z-index: 9; touch-action: pan-y; }
 .phone:has(.preview-bar) .fab { display: none; } /* it would sit under the bar (and can't be used while looking) */
+
+/* Jar page: filters & day groups */
+.jar-filter { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; margin: 0 -4px 8px; padding: 2px 4px; scrollbar-width: none; }
+.jar-filter::-webkit-scrollbar { display: none; }
+.jar-filter .chip { flex: none; white-space: nowrap; }
+.day-month { font-size: 13px; font-weight: 700; color: var(--primary); margin: 16px 0 0; text-transform: uppercase; letter-spacing: .04em; }
+.day-head { display: flex; align-items: baseline; justify-content: space-between; margin: 14px 2px 8px; }
+.day-head strong { font-size: 14px; }
+.day-head small { color: var(--muted); font-size: 12px; }
+.memory-row .date { display: inline-flex; align-items: center; gap: 4px; }
+.jar-no-match { text-align: center; color: var(--muted); padding: 24px 0; }
+.jar-no-match p { margin-bottom: 12px; }
+
+/* Loading placeholder: the pet going blurry and clear (PetLoader.vue) */
+.pet-loader { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; pointer-events: none; }
+.pet-loader .pet-art { width: 62%; max-width: 180px; height: auto; object-fit: contain; animation: pet-loading 1.6s ease-in-out infinite alternate; }
+.pet-loader.still .pet-art { animation: none; opacity: .45; filter: grayscale(.4); }
+.media-loading { position: absolute; inset: 0; }
+.photo-frame .media-loading { background: var(--primary-light); }
+.thumb-video .media-loading { background: #2b2220; }
+.replay-stage .media-loading { background: transparent; }
+@keyframes pet-loading { from { filter: blur(6px); opacity: .55; } to { filter: blur(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pet-loader .pet-art { animation-duration: 3s; } }
