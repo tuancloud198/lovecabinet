@@ -5,7 +5,7 @@ from common.api import ScopedViewSet
 from common.services import couple_for
 from quizzes.models import Question
 from quizzes.serializers.quiz_serializers import QuestionSerializer
-from quizzes.services import POINTS_PER_ANSWER, answer_question, streaks
+from quizzes.services import answer_question, streaks
 
 
 class QuestionViewSet(ScopedViewSet):
@@ -32,7 +32,7 @@ class QuestionViewSet(ScopedViewSet):
             choice = int(request.data.get('choice'))
         except (TypeError, ValueError):
             raise ValidationError('Lựa chọn không hợp lệ.')
-        answer_question(question, request.user, choice)
+        answer = answer_question(question, request.user, choice)
         question = self.get_queryset().get(pk=question.pk)
         current, longest = streaks(question.couple)
-        return Response({'question': self.get_serializer(question).data, 'points': POINTS_PER_ANSWER, 'streak': current, 'max_streak': longest})
+        return Response({'question': self.get_serializer(question).data, 'points': answer.points, 'streak': current, 'max_streak': longest})

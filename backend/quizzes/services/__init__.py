@@ -1,12 +1,12 @@
 from datetime import timedelta
 from django.db import IntegrityError, transaction
-from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from couples.models import Couple
+from couples.models import QUIZ_POINTS
+from couples.points import award
 from quizzes.models import Answer
 
-POINTS_PER_ANSWER = 2
+POINTS_PER_ANSWER = QUIZ_POINTS
 
 
 def answer_question(question, user, choice):
@@ -20,7 +20,7 @@ def answer_question(question, user, choice):
     try:
         with transaction.atomic():
             answer = Answer.objects.create(question=question, user=user, choice=choice, answered_on=timezone.localdate())
-            Couple.objects.filter(pk=question.couple_id).update(pet_points=F('pet_points') + POINTS_PER_ANSWER)
+            answer.points = award(question.couple_id, POINTS_PER_ANSWER)  # 0 once the day's limit is reached
     except IntegrityError:  # answered at the same moment from another device
         raise ValidationError('Câu này đã được trả lời rồi.')
     return answer

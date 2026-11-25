@@ -488,8 +488,8 @@ class WorkflowTests(APITestCase):
         self.assertEqual((response.data['question']['correct'], response.data['question']['answer']['correct'], response.data['points'], response.data['streak']), (2, False, 2, 1))
         self.assertEqual(self.client.post(url + 'answer/', {'choice': 2}, format='json').status_code, 400)  # only once
         couple = Couple.objects.get()
-        self.assertEqual(couple.pet_points, 2)
-        self.assertEqual(self.client.patch(f'/api/couples/{couple.pk}/', {'pet_points': 999}, format='json').data['pet_points'], 2)  # read-only
+        self.assertEqual(couple.points_earned, 2)
+        self.assertEqual(self.client.patch(f'/api/couples/{couple.pk}/', {'points_earned': 999}, format='json').data['points_earned'], 2)  # read-only
         self.auth(self.alice)
         self.assertEqual(self.client.delete(url).status_code, 400)  # answered: kept as history
         # Streak: days with any answer, by either partner.
@@ -541,18 +541,27 @@ class WorkflowTests(APITestCase):
         self.assertEqual([(i['id'], i['price'], i['owned']) for i in shop['items']], [('theme_pink', 50, False), ('pet_cat', 50, False), ('pet_ragdog', 300, False)])
         self.assertEqual(self.client.post('/api/shop/theme_pink/buy/').status_code, 400)  # not enough points
         self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'pink'}, format='json').status_code, 400)  # not owned
-        couple.pet_points = 42  # e.g. 21 quiz answers
-        couple.save()
+        couple.points_earned += 42  # e.g. 21 quiz answers
+        couple.save(update_fields=['points_earned'])
         response = self.client.post('/api/shop/theme_pink/buy/')
         self.assertEqual((response.status_code, response.data['spent'], response.data['balance'], response.data['items'][0]['owned']), (201, 50, 2, True))
         self.assertEqual(self.client.post('/api/shop/theme_pink/buy/').status_code, 400)  # bought once per couple
         self.assertEqual(self.client.post('/api/shop/cat/buy/').status_code, 404)
         couple.refresh_from_db()
-        self.assertEqual(couple.pet_points, 42)  # buying never takes points from the pet
+        self.assertEqual((couple.points_earned, couple.points_spent), (52, 50))  # buying never takes points from the pet
         self.auth(self.bob)  # the partner owns it too and picks their own theme
         self.assertEqual(self.client.get('/api/shop/').data['balance'], 2)
         self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'pink'}, format='json').data['theme'], 'pink')
         self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'ocean'}, format='json').status_code, 400)
+        # Items live in the shop table: a new one shows up; one taken off sale can't be bought but stays owned.
+        from shop.models import ShopItem
+        ShopItem.objects.create(key='theme_mint', kind='theme', name='Bạc hà', price=1, position=5)
+        self.assertEqual(self.client.get('/api/shop/').data['items'][0]['id'], 'theme_mint')
+        ShopItem.objects.filter(key__in=['theme_mint', 'theme_pink']).update(active=False)
+        ids = [i['id'] for i in self.client.get('/api/shop/').data['items']]
+        self.assertEqual(ids, ['theme_pink', 'pet_cat', 'pet_ragdog'])  # mint gone, pink still listed as owned
+        self.assertEqual(self.client.post('/api/shop/theme_mint/buy/').status_code, 404)
+        self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'pink'}, format='json').data['theme'], 'pink')
         self.auth(self.alice)
         self.assertEqual(self.client.get('/api/users/me/').data['theme'], '')
     def test_buy_cat_and_switch_pet_type(self):
@@ -565,15 +574,61 @@ class WorkflowTests(APITestCase):
         response = self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'cat'}, format='json')
         self.assertEqual(response.status_code, 400)  # not bought yet
         self.assertIn('pet_type', response.data)
-        couple.pet_points = 60
-        couple.save()
+        couple.points_earned = 60
+        couple.save(update_fields=['points_earned'])
         self.assertEqual(self.client.post('/api/shop/pet_cat/buy/').status_code, 201)
         response = self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'cat'}, format='json')
         self.assertEqual((response.status_code, response.data['pet_type'], response.data['pet_name']), (200, 'cat', 'Bờm'))
         couple.refresh_from_db()
-        self.assertEqual(couple.pet_points, 60)  # growth is kept
+        self.assertEqual((couple.points_earned, couple.points_spent), (60, 50))  # growth is kept
         self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'dog'}, format='json').data['pet_type'], 'dog')
         self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'fish'}, format='json').status_code, 400)
+    def test_points_follow_memories(self):
+        from couples.models import Couple
+        memory = self.setup_memory()
+        couple = Couple.objects.get()
+        self.assertEqual((couple.points_earned, self.client.get('/api/shop/').data['earned']), (10, 10))
+        jar = memory.jar
+        memory2 = Memory.objects.create(jar=jar, author=self.alice, title='Hai', date='2026-11-02')
+        couple.refresh_from_db()
+        self.assertEqual(couple.points_earned, 20)
+        memory2.delete()  # a deleted memory takes its points back
+        couple.refresh_from_db()
+        self.assertEqual(couple.points_earned, 10)
+        Memory.objects.create(jar=jar, author=self.alice, title='Ba', date='2026-11-03')
+        jar.delete()  # deleting a jar deletes its memories, and their points
+        couple.refresh_from_db()
+        self.assertEqual(couple.points_earned, 0)
+    def test_daily_points_limit(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from couples.models import Couple, DailyPoints
+        today = timezone.localdate()
+        memory = self.setup_memory()  # pairing and making a jar earn nothing; the memory +10 today
+        couple = Couple.objects.get()
+        self.assertEqual(list(DailyPoints.objects.values_list('day', 'limit', 'earned')), [(today, 100, 10)])
+        self.assertEqual(memory.points_awarded, 10)
+        DailyPoints.objects.filter(couple=couple, day=today).update(earned=95)  # almost at the limit
+        jar = memory.jar
+        partial = Memory.objects.create(jar=jar, author=self.alice, title='5', date='2026-11-02')
+        nothing = Memory.objects.create(jar=jar, author=self.alice, title='0', date='2026-11-02')
+        couple.refresh_from_db()
+        self.assertEqual((partial.points_awarded, nothing.points_awarded, couple.points_earned), (5, 0, 15))
+        self.assertEqual(DailyPoints.objects.get(couple=couple, day=today).earned, 100)
+        data = self.client.get(f'/api/couples/{couple.pk}/').data
+        self.assertEqual((data['points_today'], data['daily_points_limit']), (100, 100))
+        nothing.delete()  # earned nothing: takes nothing back
+        couple.refresh_from_db()
+        self.assertEqual((couple.points_earned, DailyPoints.objects.get(day=today).earned), (15, 100))
+        partial.delete()  # earned 5 today: the 5 come back to today's allowance
+        couple.refresh_from_db()
+        self.assertEqual((couple.points_earned, DailyPoints.objects.get(day=today).earned), (10, 95))
+        DailyPoints.objects.filter(day=today).update(day=today - timedelta(days=1), earned=100)  # as if that was yesterday
+        fresh = Memory.objects.create(jar=jar, author=self.alice, title='mới', date='2026-11-03')
+        couple.refresh_from_db()
+        self.assertEqual((fresh.points_awarded, couple.points_earned), (10, 20))
+        self.assertEqual(list(DailyPoints.objects.values_list('day', 'earned')), [(today, 10), (today - timedelta(days=1), 100)])  # a new row for the new day
+        self.assertEqual(self.client.get(f'/api/couples/{couple.pk}/').data['points_today'], 10)
     def test_pick_pet_mood(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id

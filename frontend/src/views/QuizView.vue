@@ -10,6 +10,7 @@ import { QUESTION_BANK } from '@/quizBank.js'
 import { state, partner, run, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import DailyPoints from '@/components/DailyPoints.vue'
 import QuizBattle from '@/components/QuizBattle.vue'
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -35,7 +36,7 @@ function choose(index) {
   run(async () => {
     const data = await api(`quiz-questions/${current.value.id}/answer/`, { method: 'POST', body: { choice: index } })
     state.quiz = state.quiz.map(q => (q.id === data.question.id ? data.question : q))
-    Object.assign(state.couple, { quiz_streak: data.streak, quiz_max_streak: data.max_streak, pet_points: (state.couple.pet_points || 0) + data.points })
+    Object.assign(state.couple, { quiz_streak: data.streak, quiz_max_streak: data.max_streak, points_earned: (state.couple.points_earned || 0) + data.points, points_today: (state.couple.points_today || 0) + data.points })
     result.value = { question: data.question, points: data.points }
   })
 }
@@ -96,8 +97,9 @@ function removeQuestion(question) {
         <Flame :size="22" /><strong>{{ state.couple.quiz_streak || 0 }}</strong><small>ngày liên tiếp</small>
       </div>
       <div class="quiz-stat"><Trophy :size="22" /><strong>{{ state.couple.quiz_max_streak || 0 }}</strong><small>kỷ lục</small></div>
-      <div class="quiz-stat"><Star :size="22" /><strong>{{ state.couple.pet_points || 0 }}</strong><small>điểm cho {{ petName }}</small></div>
+      <div class="quiz-stat"><Star :size="22" /><strong>{{ state.couple.points_earned || 0 }}</strong><small>điểm cho {{ petName }}</small></div>
     </section>
+    <DailyPoints />
     <p class="muted center quiz-hint">{{ answeredToday ? 'Hôm nay đã giữ chuỗi rồi 🔥' : 'Trả lời một câu hôm nay để giữ chuỗi nhé!' }}</p>
 
     <div class="segmented quiz-tabs" role="tablist">
@@ -158,7 +160,7 @@ function removeQuestion(question) {
           <p class="quiz-result" :class="result.question.answer.correct ? 'ok' : 'bad'">
             {{ result.question.answer.correct ? 'Chính xác! Bạn hiểu người ấy ghê 🎉' : `Chưa đúng rồi, đáp án là ${LETTERS[result.question.correct]} 😝` }}
           </p>
-          <p class="muted center">+{{ result.points }} điểm cho {{ petName }} · chuỗi {{ state.couple.quiz_streak }} ngày 🔥</p>
+          <p class="muted center">{{ result.points ? `+${result.points} điểm cho ${petName}` : 'Hôm nay đã đủ điểm rồi' }} · chuỗi {{ state.couple.quiz_streak }} ngày 🔥</p>
           <button class="btn primary block" @click="nextQuestion">{{ waiting.length ? `Câu tiếp theo (${waiting.length})` : 'Xong' }}</button>
         </template>
       </div>

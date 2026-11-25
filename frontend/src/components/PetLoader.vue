@@ -6,7 +6,7 @@ import { petStatus } from '@/characters.js'
 import { state } from '@/store.js'
 import PetArt from '@/components/PetArt.vue'
 defineProps({ still: Boolean })
-const stage = computed(() => state.couple ? petStatus(state.memories || [], state.couple.pet_points || 0).stageIndex : 0)
+const stage = computed(() => state.couple ? petStatus(state.memories || [], state.couple.points_earned || 0).stageIndex : 0)
 </script>
 
 <template>

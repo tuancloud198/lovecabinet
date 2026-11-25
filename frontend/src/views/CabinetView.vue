@@ -7,6 +7,7 @@ import { state, partner, navigate, run, cabinetForYear, toast } from '@/store.js
 import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
+import DailyPoints from '@/components/DailyPoints.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import JarArt from '@/components/JarArt.vue'
@@ -83,6 +84,7 @@ function saveJar() {
       <span class="visually-hidden">Tủ chung của {{ state.me.display_name }} và {{ partner?.display_name }}</span>
     </div>
     <LoveCounter />
+    <DailyPoints />
     <div v-if="state.memories.length" class="cabinet-actions">
       <button class="chip replay-chip" @click="choosingRange = true"><Play :size="14" fill="currentColor" /> Xem lại kỷ niệm</button>
       <button class="chip replay-chip" @click="navigate('map')"><MapIcon :size="14" /> Bản đồ</button>

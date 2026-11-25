@@ -8,7 +8,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import PetArt from '@/components/PetArt.vue'
 
-const pet = computed(() => petStatus(state.memories, state.couple.pet_points || 0))
+const pet = computed(() => petStatus(state.memories, state.couple.points_earned || 0))
 const name = computed(() => state.couple.pet_name)
 const species = computed(() => state.preview?.pet || state.couple.pet_type) // the pet shown (a shop preview, else ours)
 const remaining = computed(() => pet.value.target - pet.value.count)

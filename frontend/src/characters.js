@@ -15,7 +15,8 @@ export function characterOf(user) {
   return (user?.id ?? 0) % 2 ? 'male' : 'female'
 }
 
-// Pet points: each memory is worth MEMORY_POINTS, each answered quiz question 2 (couple.pet_points).
+// Pet points: each memory is worth MEMORY_POINTS, each answered quiz question QUIZ_POINTS. The server keeps
+// the total on the couple (couple.points_earned); these are for the hints shown to the user.
 export const MEMORY_POINTS = 10
 export const QUIZ_POINTS = 2
 const LEVEL_POINTS = 100
@@ -32,8 +33,8 @@ const MOODS = [
 ]
 
 /** Pet growth: one level per 100 points (10 memories); stages at 300 and 600 points. */
-export function petStatus(memories, bonusPoints = 0) {
-  const count = memories.length * MEMORY_POINTS + bonusPoints
+export function petStatus(memories, earned = 0) {
+  const count = earned // couple.points_earned: memories and quiz answers (memories also set the mood below)
   const stageIndex = STAGES.findLastIndex(stage => count >= stage.min)
   const next = STAGES[stageIndex + 1]
   const latest = memories.reduce((max, m) => (m.created_at > max ? m.created_at : max), '')
