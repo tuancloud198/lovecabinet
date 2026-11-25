@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { ChevronRight, Camera, Play, Trash2, MapPin } from 'lucide-vue-next'
 import { api } from '@/api.js'
-import { displayDate, daysUntil, shortDate } from '@/format.js'
+import { displayDate, daysUntil, isoDate } from '@/format.js'
 import { placeGroups } from '@/location.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
@@ -20,22 +20,29 @@ const member = id => state.couple.members.find(m => m.id === id)
 const memories = computed(() => state.memories.filter(m => m.jar === props.id).sort((a, b) => b.date.localeCompare(a.date)))
 const replaying = ref(false) // replay every memory in this jar (oldest first)
 
-// ---- filters (month and place) and day groups ----
-const month = ref(null) // 'YYYY-MM' or 'YYYY-MM-DD' (prefix of memory.date), or null = all
-const placeKey = ref(null) // placeGroups key or null = all
-// Date options: the months present, or the days when everything is in one month.
-const monthList = computed(() => [...new Set(memories.value.map(m => m.date.slice(0, 7)))])
-const months = computed(() => monthList.value.length > 1 ? monthList.value : [...new Set(memories.value.map(m => m.date))])
+// ---- filters (date range and place, like the replay sheet) and day groups ----
+const today = isoDate()
+const now = new Date()
+const first = computed(() => memories.value.at(-1)?.date ?? today)
+const last = computed(() => (memories.value[0]?.date > today ? memories.value[0].date : today))
+const daysAgo = n => isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - n))
+const presets = computed(() => [
+  { label: '7 ngày qua', from: daysAgo(6), to: today },
+  { label: 'Tháng này', from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: today },
+  { label: 'Năm nay', from: `${now.getFullYear()}-01-01`, to: today },
+  { label: 'Tất cả', from: '', to: '' },
+])
+const range = ref({ from: '', to: '' }) // '' = no limit on that side
+const isPreset = p => p.from === range.value.from && p.to === range.value.to
 const places = computed(() => placeGroups(memories.value))
-const showMonths = computed(() => months.value.length > 1)
-const showPlaces = computed(() => places.value.length > 1 || (places.value.length === 1 && places.value[0].memories.length < memories.value.length))
-const monthLabel = key => key.length > 7 ? shortDate(key) : `Th ${key.slice(5)}/${key.slice(0, 4)}`
+const placeKey = ref('') // a place group's key; '' = everywhere
 const filtered = computed(() => {
-  const ids = placeKey.value == null ? null : new Set(places.value.find(g => g.key === placeKey.value)?.memories.map(m => m.id) ?? [])
-  return memories.value.filter(m => (month.value == null || m.date.startsWith(month.value)) && (!ids || ids.has(m.id)))
+  const { from, to } = range.value
+  const ids = placeKey.value ? new Set(places.value.find(g => g.key === placeKey.value)?.memories.map(m => m.id) ?? []) : null
+  return memories.value.filter(m => (!from || m.date >= from) && (!to || m.date <= to) && (!ids || ids.has(m.id)))
 })
-const filtering = computed(() => month.value != null || placeKey.value != null)
-function clearFilters() { month.value = null; placeKey.value = null }
+const filtering = computed(() => !!(range.value.from || range.value.to || placeKey.value))
+function clearFilters() { range.value = { from: '', to: '' }; placeKey.value = '' }
 const WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 function dayLabel(iso) {
   const diff = daysUntil(iso)
@@ -87,16 +94,21 @@ function removeJar() {
       <EmptyState v-if="!memories.length" title="Chưa có kỷ niệm nào" text="Hãy chụp một bức ảnh để lưu giữ khoảnh khắc đầu tiên cùng nhau nhé! ♡">
         <button class="btn primary" @click="navigate('capture', { jarId: jar.id })"><Camera :size="18" /> Chụp ngay</button>
       </EmptyState>
-      <template v-if="memories.length > 1 && (showMonths || showPlaces)">
-        <div v-if="showMonths" class="chips jar-filter">
-          <button class="chip" :class="month == null ? 'chosen' : 'soft'" @click="month = null">Tất cả</button>
-          <button v-for="ym in months" :key="ym" class="chip" :class="month === ym ? 'chosen' : 'soft'" @click="month = month === ym ? null : ym">{{ monthLabel(ym) }}</button>
+      <div v-if="memories.length > 1" class="jar-filters stack">
+        <div class="chips replay-presets">
+          <button v-for="p in presets" :key="p.label" type="button" class="chip" :class="isPreset(p) ? 'chosen' : 'soft'" @click="range = { from: p.from, to: p.to }">{{ p.label }}</button>
         </div>
-        <div v-if="showPlaces" class="chips jar-filter">
-          <button class="chip" :class="placeKey == null ? 'chosen' : 'soft'" @click="placeKey = null"><MapPin :size="13" /> Mọi nơi</button>
-          <button v-for="g in places" :key="g.key" class="chip" :class="placeKey === g.key ? 'chosen' : 'soft'" @click="placeKey = placeKey === g.key ? null : g.key">{{ g.label }} · {{ g.memories.length }}</button>
+        <div class="range-fields">
+          <label class="field">Từ ngày<input v-model="range.from" type="date" :min="first" :max="range.to || last" /></label>
+          <label class="field">Đến ngày<input v-model="range.to" type="date" :min="range.from || first" :max="last" /></label>
         </div>
-      </template>
+        <label v-if="places.length" class="field">Địa điểm
+          <select v-model="placeKey">
+            <option value="">Mọi nơi</option>
+            <option v-for="g in places" :key="g.key" :value="g.key">📍 {{ g.label }} ({{ g.memories.length }})</option>
+          </select>
+        </label>
+      </div>
       <div v-if="memories.length && !filtered.length" class="jar-no-match">
         <p>Không có kỷ niệm nào khớp bộ lọc.</p>
         <button class="btn small" @click="clearFilters">Xóa bộ lọc</button>

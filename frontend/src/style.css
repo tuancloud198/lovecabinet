@@ -631,9 +631,7 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .phone:has(.preview-bar) .fab { display: none; } /* it would sit under the bar (and can't be used while looking) */
 
 /* Jar page: filters & day groups */
-.jar-filter { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; margin: 0 -4px 8px; padding: 2px 4px; scrollbar-width: none; }
-.jar-filter::-webkit-scrollbar { display: none; }
-.jar-filter .chip { flex: none; white-space: nowrap; }
+.jar-filters { gap: 10px; margin-bottom: 4px; }
 .day-month { font-size: 13px; font-weight: 700; color: var(--primary); margin: 16px 0 0; text-transform: uppercase; letter-spacing: .04em; }
 .day-head { display: flex; align-items: baseline; justify-content: space-between; margin: 14px 2px 8px; }
 .day-head strong { font-size: 14px; }

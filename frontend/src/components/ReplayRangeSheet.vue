@@ -35,7 +35,7 @@ const isPreset = p => p.from === range.value.from && p.to === range.value.to
 </script>
 
 <template>
-  <BottomSheet title="Xem lại kỷ niệm ♡" @close="emit('close')">
+  <BottomSheet title="Xem lại kỷ niệm" @close="emit('close')">
     <form class="stack" @submit.prevent="emit('start', selected, group?.only ?? null)">
       <div class="chips replay-presets">
         <button v-for="p in presets" :key="p.label" type="button" class="chip" :class="isPreset(p) ? 'chosen' : 'soft'" @click="range = { from: p.from, to: p.to }">{{ p.label }}</button>
