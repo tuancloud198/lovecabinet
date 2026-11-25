@@ -71,7 +71,7 @@ All routes use `/api/` and trailing slashes. Except registration/login, send `Au
 | `couple-invitations/` | GET pending `received` and `sent` invitations; POST `{ "tag": "#A7K2M9QX" }` to invite that user |
 | `couple-invitations/<id>/accept/` | POST; recipient accepts pairing |
 | `couple-invitations/<id>/decline/` | POST; recipient declines (204); the sender may invite again |
-| `couples/`, `couples/<id>/` | GET shared couple, members and memory count; PATCH `name`, `anniversary`, `pet_name`, `pet_type` (`dog`, `cat`, `capybara`) |
+| `couples/`, `couples/<id>/` | GET shared couple, members and memory count; PATCH `name`, `anniversary`, `pet_name`, `pet_type` (`dog`; other pets once bought in the shop, e.g. `cat` = item `pet_cat`) |
 | `cabinets/`, `jars/`, `memories/`, `events/` | CRUD collection and detail routes |
 | `memories/<id>/comment/` | POST `{ "text": "..." }` |
 | `memories/<id>/react/` | POST; toggle heart |

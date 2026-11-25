@@ -531,28 +531,42 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .avatar-edit-badge { position: absolute; right: 2px; bottom: 2px; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: #fff; border: 3px solid var(--surface); box-shadow: var(--shadow); }
 .link-button.avatar-reset { font-size: 12px; text-decoration: underline; padding: 4px 8px; }
 
-/* Đố vui: head-to-head scoreboard */
-.battle { margin-bottom: 12px; padding: 14px 14px 12px; border-radius: var(--r-xl); color: #fff; background: linear-gradient(135deg, #8E2F28 0%, #B9473E 48%, #486454 52%, #2F4A3B 100%); box-shadow: 0 10px 24px rgba(51, 41, 35, .25); }
-.battle-title { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
-.battle-fighters { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; margin: 6px 0 8px; }
-.fighter { display: flex; flex-direction: column; align-items: center; gap: 4px; transition: transform .3s; }
-.fighter strong { font-size: 13px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fighter .character-avatar { border: 3px solid rgba(255, 255, 255, .85); box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
-.fighter.leader { transform: scale(1.08); }
-.fighter.leader .character-avatar { border-color: #F3C449; box-shadow: 0 0 0 4px rgba(243, 196, 73, .35), 0 4px 12px rgba(0, 0, 0, .25); }
-.fighter.loser { opacity: .85; }
-.crown { height: 22px; font-size: 20px; line-height: 22px; }
-.battle-vs { font-size: 26px; font-weight: 900; font-style: italic; color: #F3C449; text-shadow: 0 2px 0 rgba(0, 0, 0, .3); padding: 0 8px 26px; }
-.battle-rows { margin: 0; display: flex; flex-direction: column; gap: 4px; }
-.battle-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 4px 8px; border-radius: var(--r-s); background: rgba(255, 255, 255, .12); }
-.battle-row dt { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .85; text-align: center; padding: 0 6px; }
-.battle-row dd { margin: 0; font-size: 18px; font-weight: 800; text-align: center; opacity: .8; }
-.battle-row dd.win { opacity: 1; color: #F3C449; }
-.battle-row dd.win::after { content: ' ▲'; font-size: 10px; vertical-align: middle; }
-.battle-bar { position: relative; height: 12px; margin: 12px 4px 6px; border-radius: 999px; background: #6E9A7E; overflow: visible; }
-.battle-bar-me { position: absolute; inset: 0 auto 0 0; border-radius: 999px 0 0 999px; background: #E57468; transition: width .4s; }
-.battle-bar-knot { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 18px; transition: left .4s; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .4)); }
-.battle-shout { text-align: center; font-size: 13px; font-weight: 700; }
+/* Đố vui: head-to-head scoreboard. A soft card, pink on my side and green on theirs, the pet as the tug-of-war knot. */
+.battle { position: relative; margin-bottom: 12px; padding: 14px 14px 12px; border-radius: var(--r-xl); color: var(--text); background: linear-gradient(90deg, var(--primary-light) 0%, var(--surface) 40% 60%, var(--secondary-light) 100%); border: 1px solid var(--border-soft); box-shadow: var(--shadow); overflow: hidden; }
+.battle::before, .battle::after { content: '♡'; position: absolute; top: 10px; font-size: 20px; font-weight: 700; line-height: 1; color: var(--primary-border); transform: rotate(-14deg); }
+.battle::before { left: 14px; }
+.battle::after { right: 14px; transform: rotate(14deg); color: color-mix(in srgb, var(--secondary) 35%, var(--secondary-light)); }
+.battle-title { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 17px; font-weight: 700; color: var(--heading); }
+.battle-title-heart { color: var(--primary); }
+.battle-fighters { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: 10px 0 10px; }
+.fighter { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.fighter-pic { position: relative; display: inline-flex; transition: transform .3s; }
+.fighter .character-avatar { border: 3px solid var(--surface); box-shadow: 0 4px 12px rgba(98, 66, 35, .12); }
+.fighter.leader .fighter-pic { transform: scale(1.06); }
+.fighter.leader .character-avatar { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 4px 12px rgba(98, 66, 35, .12); }
+.fighter strong { max-width: 120px; padding: 2px 12px; border-radius: 999px; background: var(--surface); font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fighter.me strong { color: var(--primary-strong); border: 1px solid var(--primary-border); }
+.fighter.them strong { color: color-mix(in srgb, var(--secondary) 80%, var(--text)); border: 1px solid color-mix(in srgb, var(--secondary) 30%, var(--secondary-light)); }
+.crown { position: absolute; top: -8px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--text); border: 2px solid var(--surface); transform: rotate(14deg); box-shadow: 0 2px 6px rgba(98, 66, 35, .15); }
+.battle-vs { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 10px 26px; }
+.battle-vs .emoji-icon { box-sizing: content-box; font-size: 22px; padding: 9px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border-soft); box-shadow: 0 3px 10px var(--primary-glow); animation: battle-beat 1.6s ease-in-out infinite; }
+.battle-vs small { font-size: 11px; font-weight: 700; color: var(--muted); }
+@keyframes battle-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.1); } 30% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .battle-vs .emoji-icon { animation: none; } }
+.battle-rows { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.battle-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border-soft); }
+.battle-row dt { font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; }
+.battle-row dd { justify-self: center; min-width: 72px; margin: 0; padding: 2px 12px; border-radius: 999px; font-size: 16px; font-weight: 700; text-align: center; color: var(--text); }
+.battle-row dd.win { font-weight: 800; }
+.battle-row dd.me.win { background: var(--primary-light); color: var(--primary-strong); }
+.battle-row dd.them.win { background: var(--secondary-light); color: color-mix(in srgb, var(--secondary) 80%, var(--text)); }
+.battle-row dd.win::after { content: ' ♥'; font-size: 11px; vertical-align: 2px; }
+.battle-bar { position: relative; height: 40px; margin: 6px 4px 4px; display: flex; align-items: center; }
+.battle-bar-track { position: relative; width: 100%; height: 14px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--secondary) 38%, var(--secondary-light)); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-soft); }
+.battle-bar-me { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--fill-start) 70%, var(--primary-light)); transition: width .4s; }
+.battle-bar-knot { position: absolute; top: 50%; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); border: 2px solid var(--primary-border); box-shadow: 0 3px 8px rgba(98, 66, 35, .15); transform: translate(-50%, -50%); transition: left .4s; }
+.battle-bar-knot .pet-art { width: 32px; height: 32px; object-fit: contain; }
+.battle-shout { margin-top: 4px; text-align: center; font-size: 13px; font-weight: 600; color: var(--heading); }
 
 /* Hồ sơ: the partner's details */
 .partner-info { margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
@@ -650,3 +664,14 @@ main.with-nav { padding-bottom: calc(var(--nav-height) + 24px); }
 .replay-stage .media-loading { background: transparent; }
 @keyframes pet-loading { from { filter: blur(6px); opacity: .55; } to { filter: blur(0); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pet-loader .pet-art { animation-duration: 3s; } }
+
+/* Pets */
+.shop-pet-art { display: flex; align-items: center; justify-content: center; height: 88px; border-radius: var(--r-m); background: var(--chip-soft); }
+.shop-pet-art .pet-art { height: 80px; width: auto; max-width: 100%; object-fit: contain; }
+
+/* Pet page: the face picked for the big picture */
+.mood-picker { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.mood-picker button { height: 44px; min-width: 44px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--surface); border: 1.5px solid var(--border-soft); }
+.mood-picker button .pet-art { width: 34px; height: 34px; object-fit: contain; }
+.mood-picker .mood-auto { padding: 0 14px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.mood-picker button.chosen { border: 2px solid var(--primary); background: var(--primary-light); color: var(--primary); }

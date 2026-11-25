@@ -1,6 +1,12 @@
-// Character art cropped from task/ui-source (Dog-Growth.png, Design system.png).
+// The two partners' characters, cropped from task/ui-source (Dog-Growth.png, Design system.png).
 const files = import.meta.glob('/src/assets/characters/*.webp', { eager: true, import: 'default' })
 export const art = Object.fromEntries(Object.entries(files).map(([path, url]) => [path.split('/').pop().replace('.webp', ''), url]))
+
+// The couple's pet, by Couple.pet_type: a body per growth stage + a head per mood (assets/characters/<pet>/).
+import dog from '@/assets/characters/dog/index.js'
+import cat from '@/assets/characters/cat/index.js'
+import ragdog from '@/assets/characters/ragdog/index.js'
+export const PETS = { dog, cat, ragdog }
 
 /** 'female' (Cún Nón Lá) or 'male' (Cún Mũ Xanh) for a user, from their gender. */
 export function characterOf(user) {
@@ -43,7 +49,7 @@ export function petStatus(memories, bonusPoints = 0) {
   }
 }
 
-/** Stage name: the first stage is 'Cún con'. */
-export function stageLabel(index) {
-  return index === 0 ? 'Cún con' : STAGES[index].label
+/** Stage name: the first stage is 'Cún con' (or 'Mèo con' for the cat). */
+export function stageLabel(index, species = 'dog') {
+  return index === 0 ? (species === 'cat' ? 'Mèo con' : 'Cún con') : STAGES[index].label
 }

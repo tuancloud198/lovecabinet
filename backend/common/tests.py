@@ -538,7 +538,7 @@ class WorkflowTests(APITestCase):
         couple = Couple.objects.get()
         shop = self.client.get('/api/shop/').data
         self.assertEqual((shop['earned'], shop['spent'], shop['balance']), (10, 0, 10))
-        self.assertEqual([(i['id'], i['price'], i['owned']) for i in shop['items']], [('theme_pink', 50, False)])
+        self.assertEqual([(i['id'], i['price'], i['owned']) for i in shop['items']], [('theme_pink', 50, False), ('pet_cat', 50, False), ('pet_ragdog', 300, False)])
         self.assertEqual(self.client.post('/api/shop/theme_pink/buy/').status_code, 400)  # not enough points
         self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'pink'}, format='json').status_code, 400)  # not owned
         couple.pet_points = 42  # e.g. 21 quiz answers
@@ -555,13 +555,41 @@ class WorkflowTests(APITestCase):
         self.assertEqual(self.client.patch('/api/users/me/', {'theme': 'ocean'}, format='json').status_code, 400)
         self.auth(self.alice)
         self.assertEqual(self.client.get('/api/users/me/').data['theme'], '')
+    def test_buy_cat_and_switch_pet_type(self):
+        from couples.models import Couple
+        self.pair()
+        couple = Couple.objects.get()
+        couple_id = couple.id
+        self.auth(self.alice)
+        self.assertEqual(self.client.get(f'/api/couples/{couple_id}/').data['pet_type'], 'dog')
+        response = self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'cat'}, format='json')
+        self.assertEqual(response.status_code, 400)  # not bought yet
+        self.assertIn('pet_type', response.data)
+        couple.pet_points = 60
+        couple.save()
+        self.assertEqual(self.client.post('/api/shop/pet_cat/buy/').status_code, 201)
+        response = self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'cat'}, format='json')
+        self.assertEqual((response.status_code, response.data['pet_type'], response.data['pet_name']), (200, 'cat', 'Bờm'))
+        couple.refresh_from_db()
+        self.assertEqual(couple.pet_points, 60)  # growth is kept
+        self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'dog'}, format='json').data['pet_type'], 'dog')
+        self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'fish'}, format='json').status_code, 400)
+    def test_pick_pet_mood(self):
+        self.pair()
+        couple_id = Membership.objects.get(user=self.alice).couple_id
+        self.auth(self.alice)
+        self.assertEqual(self.client.get(f'/api/couples/{couple_id}/').data['pet_mood'], '')
+        self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_mood': 'shy'}, format='json').data['pet_mood'], 'shy')
+        self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_mood': 'angry'}, format='json').status_code, 400)
+        self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_mood': ''}, format='json').data['pet_mood'], '')
     def test_rename_pet_and_change_type(self):
         self.pair()
         couple_id = Membership.objects.get(user=self.alice).couple_id
         self.auth(self.alice)
-        response = self.client.patch(f'/api/couples/{couple_id}/', {'pet_name': 'Mochi', 'pet_type': 'capybara'})
+        response = self.client.patch(f'/api/couples/{couple_id}/', {'pet_name': 'Mochi'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual((response.data['pet_name'], response.data['pet_type']), ('Mochi', 'capybara'))
+        self.assertEqual((response.data['pet_name'], response.data['pet_type']), ('Mochi', 'dog'))
+        self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'capybara'}).status_code, 400)  # not bought
         self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_type': 'dragon'}).status_code, 400)
         self.assertEqual(self.client.patch(f'/api/couples/{couple_id}/', {'pet_name': '  '}, format='json').status_code, 400)
         self.assertEqual(self.client.get(f'/api/couples/{couple_id}/').data['pet_name'], 'Mochi')

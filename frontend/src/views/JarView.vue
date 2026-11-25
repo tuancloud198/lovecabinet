@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { ChevronRight, Camera, Play, Trash2, MapPin } from 'lucide-vue-next'
 import { api } from '@/api.js'
 import { displayDate, daysUntil, isoDate } from '@/format.js'
-import { placeGroups } from '@/location.js'
 import { state, navigate, run, load, toast } from '@/store.js'
 import AppHeader from '@/components/AppHeader.vue'
 import CharacterAvatar from '@/components/CharacterAvatar.vue'
@@ -34,15 +33,33 @@ const presets = computed(() => [
 ])
 const range = ref({ from: '', to: '' }) // '' = no limit on that side
 const isPreset = p => p.from === range.value.from && p.to === range.value.to
-const places = computed(() => placeGroups(memories.value))
-const placeKey = ref('') // a place group's key; '' = everywhere
+// Place: typed text, matched against the names of the memory's place and its photos' places (accents and
+// a leading "Đường"/"Phố" ignored). Names come from reverse geocoding, which names the same area several
+// ways ("Đường Tràng An, …" / "Tràng An, …"), so suggestions list each name once, keyed the same way.
+const fold = text => (text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim().replace(/^(duong|pho)\s+/, '')
+const placesOf = m => [m.place, ...m.photos.map(p => p.place)].filter(Boolean)
+const placeNames = computed(() => {
+  const byKey = new Map() // folded name -> { name (the shortest spelling), count (memories) }
+  for (const m of memories.value) {
+    for (const name of new Set(placesOf(m))) {
+      const entry = byKey.get(fold(name))
+      if (!entry) byKey.set(fold(name), { name, count: 1, seen: m.id })
+      else {
+        if (name.length < entry.name.length) entry.name = name
+        if (entry.seen !== m.id) { entry.count++; entry.seen = m.id }
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+})
+const placeQuery = ref('')
 const filtered = computed(() => {
   const { from, to } = range.value
-  const ids = placeKey.value ? new Set(places.value.find(g => g.key === placeKey.value)?.memories.map(m => m.id) ?? []) : null
-  return memories.value.filter(m => (!from || m.date >= from) && (!to || m.date <= to) && (!ids || ids.has(m.id)))
+  const q = fold(placeQuery.value)
+  return memories.value.filter(m => (!from || m.date >= from) && (!to || m.date <= to) && (!q || placesOf(m).some(name => fold(name).includes(q))))
 })
-const filtering = computed(() => !!(range.value.from || range.value.to || placeKey.value))
-function clearFilters() { range.value = { from: '', to: '' }; placeKey.value = '' }
+const filtering = computed(() => !!(range.value.from || range.value.to || fold(placeQuery.value)))
+function clearFilters() { range.value = { from: '', to: '' }; placeQuery.value = '' }
 const WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 function dayLabel(iso) {
   const diff = daysUntil(iso)
@@ -102,11 +119,9 @@ function removeJar() {
           <label class="field">Từ ngày<input v-model="range.from" type="date" :min="first" :max="range.to || last" /></label>
           <label class="field">Đến ngày<input v-model="range.to" type="date" :min="range.from || first" :max="last" /></label>
         </div>
-        <label v-if="places.length" class="field">Địa điểm
-          <select v-model="placeKey">
-            <option value="">Mọi nơi</option>
-            <option v-for="g in places" :key="g.key" :value="g.key">📍 {{ g.label }} ({{ g.memories.length }})</option>
-          </select>
+        <label v-if="placeNames.length" class="field">Địa điểm
+          <input v-model="placeQuery" type="search" list="jar-places" placeholder="Mọi nơi · gõ để tìm, vd. Tràng An" autocomplete="off" enterkeyhint="search" />
+          <datalist id="jar-places"><option v-for="p in placeNames" :key="p.name" :value="p.name">{{ p.count }} kỷ niệm</option></datalist>
         </label>
       </div>
       <div v-if="memories.length && !filtered.length" class="jar-no-match">
@@ -115,7 +130,7 @@ function removeJar() {
       </div>
       <template v-for="g in groups" :key="g.date">
         <h3 v-if="g.month" class="day-month">{{ g.month }}</h3>
-        <div class="day-head"><strong>{{ g.label }}</strong><small>{{ g.items.length }} kỷ niệm</small></div>
+        <div class="day-head"><strong>{{ g.label }}</strong></div>
         <button v-for="m in g.items" :key="m.id" class="memory-row card" @click="navigate('memory', { id: m.id })">
           <span class="thumb"><PrivatePhoto v-if="coverPhoto(m)" :url="thumbOf(coverPhoto(m))" /><EmojiIcon v-else :emoji="m.photos.length ? '🎬' : m.emoji" /></span>
           <span class="row-text"><small class="date"><EmojiIcon :emoji="m.emoji" /> <template v-if="placeOf(m)"><MapPin :size="11" /> {{ placeOf(m) }}</template></small><strong>{{ m.title }}</strong><small class="clamp">{{ m.story }}</small></span>

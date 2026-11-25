@@ -24,7 +24,7 @@ const showNav = computed(() => TABS.includes(state.view.name))
 const viewKey = computed(() => state.view.name + JSON.stringify(state.view.params))
 
 // Each partner's own look (a theme bought in the shop, or one being tried): <html data-theme="pink">.
-watch(() => (state.preview ? state.preview.theme : state.me?.theme), theme => {
+watch(() => (state.preview?.theme ?? state.me?.theme), theme => {
   if (theme) document.documentElement.dataset.theme = theme
   else delete document.documentElement.dataset.theme
 }, { immediate: true })
